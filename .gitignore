@@ -1,0 +1,28 @@
+.env
+.postgres-data/
+.postgres-logs/
+__pycache__/
+*.py[cod]
+
+# Datos descargados y productos generados. Se recrean con los scripts.
+data/raw/
+data/processed/
+data/diagnostics/
+data/README.md
+
+# Solo se publican los scripts que pertenecen al proyecto de sismos.
+scripts/*
+!scripts/download_csn_catalog.py
+!scripts/download_usgs_earthquakes.py
+!scripts/run_csn_catalog_qgis.cmd
+!scripts/run_usgs_earthquakes_qgis.cmd
+!scripts/start_local_postgis.ps1
+!scripts/stop_local_postgis.ps1
+!scripts/load_catalogs_postgis.ps1
+
+# Salidas geoespaciales y logs locales.
+*.gpkg
+*.tif
+*.tiff
+*.h5
+*.log

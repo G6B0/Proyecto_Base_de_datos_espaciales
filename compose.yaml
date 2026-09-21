@@ -1,0 +1,25 @@
+services:
+  database:
+    image: postgis/postgis:17-3.5
+    container_name: sismos_chile_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
+    volumes:
+      - sismos_postgres_data:/var/lib/postgresql/data
+      - ./db:/project/db:ro
+      - ./data/processed:/project/data/processed:ro
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  sismos_postgres_data:
