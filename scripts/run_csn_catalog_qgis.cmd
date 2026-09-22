@@ -7,5 +7,5 @@ if not exist "%QGIS_PYTHON%" (
   exit /b 1
 )
 
-call "%QGIS_PYTHON%" "%~dp0download_csn_catalog.py"
+call "%QGIS_PYTHON%" "%~dp0download_csn_catalog.py" %*
 endlocal

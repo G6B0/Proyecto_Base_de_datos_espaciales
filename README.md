@@ -2,7 +2,7 @@
 
 Proyecto académico para descargar, normalizar, almacenar y analizar eventos sísmicos de Chile con **Python**, **PostgreSQL/PostGIS** y **QGIS**.
 
-El sistema integra un catálogo histórico del Centro Sismológico Nacional (CSN) con eventos recientes de USGS ComCat. Su objetivo es estudiar cómo se distribuyen los sismos en el espacio, el tiempo, la magnitud y la profundidad. **No es un sistema de predicción de terremotos.**
+El sistema integra el catálogo histórico y las publicaciones diarias del Centro Sismológico Nacional (CSN), complementadas con eventos de USGS ComCat. Su objetivo es estudiar cómo se distribuyen los sismos en el espacio, el tiempo, la magnitud y la profundidad. **No es un sistema de predicción de terremotos.**
 
 ## Qué permite hacer
 
@@ -15,7 +15,8 @@ El sistema integra un catálogo histórico del Centro Sismológico Nacional (CSN
 
 ```mermaid
 flowchart LR
-    CSN[Catálogo histórico CSN] --> PY[Scripts de descarga y normalización]
+    CSNH[CSV histórico CSN] --> PY[Scripts de descarga y normalización]
+    CSND[Páginas diarias CSN] --> PY
     USGS[API USGS ComCat] --> PY
     PY --> FILES[CSV + GeoJSON + metadatos]
     FILES --> PG[(PostgreSQL + PostGIS)]
@@ -29,11 +30,11 @@ La última carga validada durante el desarrollo contiene:
 
 | Fuente | Eventos | Cobertura del catálogo cargado |
 | --- | ---: | --- |
-| CSN | 44.691 | 1513-01-01 a 2025-06-23 |
+| CSN | 57.488 | 1513-01-01 a 2026-09-22 14:40:50 UTC |
 | USGS | 42 | Ventana 2026-08-01 a 2026-08-30; el último evento observado fue del 2026-08-29 |
-| **Total** | **44.733** | 44.733 identificadores únicos y geometrías válidas |
+| **Total** | **57.530** | Identificadores únicos por fuente y geometrías válidas |
 
-Estas cifras describen una **muestra reproducible verificada**, no un contador en tiempo real. Al volver a ejecutar los descargadores, los resultados pueden cambiar por nuevos eventos o revisiones de las fuentes.
+Esta carga fue verificada el 2026-09-22. No es un contador en tiempo real: al volver a ejecutar los descargadores, los resultados pueden cambiar por nuevos eventos o revisiones de las fuentes. Un mismo sismo también puede aparecer una vez por fuente si fue publicado tanto por CSN como por USGS.
 
 La base ya cuenta con:
 
@@ -49,7 +50,7 @@ La tabla `seismic.administrative_area` está preparada, pero los límites region
 
 | Fuente | Uso en el proyecto | Actualidad esperada |
 | --- | --- | --- |
-| [Centro Sismológico Nacional](https://www.sismologia.cl/) | Catálogo histórico chileno | El archivo masivo validado llega al 2025-06-23; no debe tratarse como un feed diario |
+| [Centro Sismológico Nacional](https://www.sismologia.cl/) | CSV histórico más páginas diarias oficiales | El CSV llega al 2025-06-23 y las páginas diarias completan desde el 2025-06-24 hasta el día de ejecución |
 | [USGS ComCat](https://earthquake.usgs.gov/fdsnws/event/1/) | Eventos recientes dentro del rectángulo de Chile | Consulta bajo demanda; los eventos recientes pueden ser preliminares |
 
 El uso académico de los datos del CSN debe citar al **Centro Sismológico Nacional de la Universidad de Chile** y respetar sus [condiciones de uso](https://sismologia.cl/accesos/uso-de-datos.html).
@@ -120,10 +121,18 @@ docker compose up -d
 
 ### 3. Descargar los catálogos
 
-Catálogo histórico del CSN:
+Catálogo histórico y eventos diarios del CSN:
 
 ```powershell
 .\scripts\run_csn_catalog_qgis.cmd
+```
+
+La primera ejecución descarga una página oficial por día desde el
+2025-06-24. Después reutiliza la caché local y vuelve a consultar solamente los
+últimos siete días para recoger revisiones. El rango también puede controlarse:
+
+```powershell
+.\scripts\run_csn_catalog_qgis.cmd --recent-start 2025-06-24 --recent-end 2026-09-22 --refresh-days 7
 ```
 
 Eventos USGS de los últimos 30 días:
@@ -199,6 +208,7 @@ PowerShell -ExecutionPolicy Bypass -File .\scripts\stop_local_postgis.ps1
 - La carga validada conserva 293 eventos sin profundidad y 15 profundidades negativas publicadas por la fuente, para permitir control de calidad sin alterar evidencia.
 - El catálogo global de USGS puede omitir sismos pequeños detectados por redes locales.
 - Los eventos recientes pueden cambiar de magnitud, profundidad, ubicación o estado de revisión.
+- Las páginas diarias recientes del CSN se vuelven a descargar durante siete días para incorporar posibles revisiones.
 - Ninguna consulta del proyecto debe interpretarse como predicción de actividad sísmica futura.
 
 ## Licencia

@@ -11,13 +11,14 @@ pero tambien contiene oceano y sectores de paises vecinos. Esa seleccion es
 intencional: permite conservar sismos costeros relevantes y posteriormente
 clasificarlos mediante consultas espaciales.
 
-La segunda fuente es el catalogo historico publico del Centro Sismologico
-Nacional. Se descarga desde el archivo utilizado por su visualizador oficial y
-se conserva sin modificar en `data/raw/csn`.
+La segunda fuente es el Centro Sismologico Nacional. El proceso combina su CSV
+historico, que actualmente termina el 2025-06-23, con las paginas diarias
+oficiales desde el 2025-06-24. Los insumos originales se conservan bajo
+`data/raw/csn`.
 
-La descarga verificada el 2026-08-30 contiene 44.691 eventos y termina el
-2025-06-23; por tanto, debe tratarse como catalogo historico y no como fuente de
-actualizacion diaria. Para el tramo reciente se utiliza USGS.
+La carga verificada el 2026-09-22 contiene 57.488 eventos del CSN y llega hasta
+el 2026-09-22 14:40:50 UTC. Las paginas recientes pueden ser revisadas por la
+fuente, por lo que el descargador actualiza nuevamente los ultimos siete dias.
 
 ## Generar una muestra
 
@@ -31,7 +32,14 @@ Descargar y normalizar el catalogo CSN completo:
 scripts\run_csn_catalog_qgis.cmd
 ```
 
-Parametros principales:
+En la primera ejecucion se descargan las paginas diarias desde el 2025-06-24.
+Las ejecuciones siguientes reutilizan la cache. Se puede especificar un rango:
+
+```powershell
+scripts\run_csn_catalog_qgis.cmd --recent-start 2025-06-24 --recent-end 2026-09-22
+```
+
+Parametros principales de USGS:
 
 | Parametro | Valor inicial | Descripcion |
 | --- | --- | --- |
@@ -40,6 +48,15 @@ Parametros principales:
 | `--min-magnitude` | `2.5` | Magnitud minima solicitada |
 | `--bbox` | `-76 -56 -66 -17` | Oeste, sur, este y norte |
 | `--review-status` | `all` | `all`, `automatic` o `reviewed` |
+
+Parametros principales del CSN:
+
+| Parametro | Valor inicial | Descripcion |
+| --- | --- | --- |
+| `--recent-start` | `2025-06-24` | Primer dia del catalogo diario |
+| `--recent-end` | dia UTC actual | Ultimo dia que se consultara |
+| `--refresh-days` | `7` | Dias finales que se vuelven a descargar |
+| `--request-delay` | `0.2` | Pausa entre solicitudes nuevas |
 
 ## Productos
 
@@ -50,13 +67,14 @@ Parametros principales:
 | `data/processed/usgs` | `*.csv` | Tabla plana para carga o revision |
 | `data/processed/usgs` | `*_metadata.json` | Consulta, fecha de descarga y validaciones |
 | `data/raw/csn` | `*_raw.csv` | Catalogo CSN original para trazabilidad |
-| `data/processed/csn` | `*.geojson` y `*.csv` | Catalogo CSN normalizado |
+| `data/raw/csn/daily` | `AAAA/MM/AAAAMMDD.html` | Paginas diarias oficiales y cache local |
+| `data/processed/csn` | `*.geojson`, `*.csv` y metadatos | Catalogo CSN combinado |
 
 ## Diccionario principal
 
 | Campo | Descripcion |
 | --- | --- |
-| `source_event_id` | Identificador estable del evento en USGS |
+| `source_event_id` | Identificador estable dentro de la fuente; los eventos diarios CSN usan su numero de informe |
 | `source_catalog_id` | Identificador original, cuando la fuente lo entrega |
 | `occurred_at_utc` | Instante de ocurrencia en UTC |
 | `updated_at_utc` | Ultima revision conocida en la fuente |
@@ -65,6 +83,8 @@ Parametros principales:
 | `reported_magnitude` | Magnitud original del CSN antes de la conversion |
 | `reported_magnitude_type` | Tipo de la magnitud original del CSN |
 | `depth_km` | Profundidad hipocentral en kilometros |
+| `place` | Referencia geografica publicada, cuando esta disponible |
+| `source_url` | Enlace al informe original del evento |
 | `review_status` | Estado `automatic` o `reviewed` |
 | `horizontal_error_km` | Incertidumbre horizontal, cuando esta disponible |
 | `depth_error_km` | Incertidumbre de profundidad, cuando esta disponible |
@@ -82,6 +102,8 @@ Parametros principales:
 
 - Los eventos recientes pueden cambiar de magnitud, profundidad o posicion.
 - Una actualizacion debe hacer `UPSERT` por `(source_code, source_event_id)`.
+- Las paginas diarias CSN quedan en cache y los ultimos siete dias se refrescan
+  para recoger revisiones.
 - La geometria procesada es 2D; la profundidad se conserva como atributo.
 - Las magnitudes solo son comparables si se considera tambien
   `magnitude_type`.
@@ -89,6 +111,6 @@ Parametros principales:
 - La muestra USGS de agosto de 2026 devolvio magnitudes desde 4,0 aunque el
   filtro solicitado era 2,5; una red global no reemplaza el detalle de la red
   local para eventos pequenos.
-- La carga CSN contiene 293 eventos sin profundidad y 15 con profundidad
+- El componente historico CSN contiene 293 eventos sin profundidad y 15 con profundidad
   negativa. Se conservan como datos de origen y deben tratarse explicitamente
   en los analisis que utilicen profundidad.

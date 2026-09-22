@@ -20,8 +20,10 @@ CREATE TEMP TABLE import_csn (
     magnitude_agency text,
     depth_km numeric,
     author text,
+    place text,
     review_status text,
-    event_type text
+    event_type text,
+    source_url text
 );
 
 \copy import_csn FROM '__CSN_CSV__' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
@@ -128,9 +130,11 @@ INSERT INTO seismic.earthquake_event (
     magnitude_agency,
     author,
     depth_km,
+    place,
     review_status,
     magnitude_error,
     event_type,
+    source_url,
     geom,
     raw_data
 )
@@ -147,9 +151,11 @@ SELECT
     magnitude_agency,
     author,
     depth_km,
+    place,
     review_status,
     magnitude_error,
     coalesce(event_type, 'earthquake'),
+    source_url,
     ST_SetSRID(ST_MakePoint(longitude, latitude), 4326),
     jsonb_strip_nulls(jsonb_build_object(
         'source', source,
@@ -157,7 +163,9 @@ SELECT
         'reported_magnitude', reported_magnitude,
         'reported_magnitude_type', reported_magnitude_type,
         'magnitude_agency', magnitude_agency,
-        'author', author
+        'author', author,
+        'place', place,
+        'source_url', source_url
     ))
 FROM import_csn
 ON CONFLICT (source_code, source_event_id) DO UPDATE SET
@@ -171,9 +179,11 @@ ON CONFLICT (source_code, source_event_id) DO UPDATE SET
     magnitude_agency = EXCLUDED.magnitude_agency,
     author = EXCLUDED.author,
     depth_km = EXCLUDED.depth_km,
+    place = EXCLUDED.place,
     review_status = EXCLUDED.review_status,
     magnitude_error = EXCLUDED.magnitude_error,
     event_type = EXCLUDED.event_type,
+    source_url = EXCLUDED.source_url,
     geom = EXCLUDED.geom,
     raw_data = EXCLUDED.raw_data,
     last_seen_at = now();
