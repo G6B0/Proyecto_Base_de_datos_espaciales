@@ -93,6 +93,47 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'La carga de catalogos fallo y fue revertida.'
     }
+
+    # Mw homogeneo para comparar escalas distintas (docs/MAGNITUDES.md).
+    Write-Host 'Calculando Mw homogeneo (db/homogenize_magnitudes.sql)'
+    & $psql -h 127.0.0.1 -p $databasePort -U $databaseUser -d $databaseName `
+        -v ON_ERROR_STOP=1 -f (Join-Path $projectRoot 'db\homogenize_magnitudes.sql')
+    if ($LASTEXITCODE -ne 0) {
+        throw 'El calculo de Mw homogeneo fallo; los eventos cargados se conservan.'
+    }
+
+    # Si la DPA ya esta cargada, se recalcula la comuna de cada evento para
+    # incluir los sismos nuevos o con ubicacion revisada.
+    $communeParts = & $psql -h 127.0.0.1 -p $databasePort -U $databaseUser -d $databaseName `
+        -Atqc 'SELECT count(*) FROM seismic.administrative_area_part'
+    if ($LASTEXITCODE -eq 0 -and [int]$communeParts -gt 0) {
+        Write-Host 'Asignando eventos a comunas (db/assign_event_areas.sql)'
+        & $psql -h 127.0.0.1 -p $databasePort -U $databaseUser -d $databaseName `
+            -v ON_ERROR_STOP=1 -f (Join-Path $projectRoot 'db\assign_event_areas.sql')
+        if ($LASTEXITCODE -ne 0) {
+            throw 'La asignacion de comunas fallo; los eventos cargados se conservan.'
+        }
+    }
+    else {
+        Write-Host 'DPA no cargada: se omite la asignacion de comunas (scripts\load_dpa_postgis.ps1).'
+    }
+
+    # Si el Censo 2024 ya esta cargado, se calculan las zonas urbanas y la
+    # poblacion cercanas a los eventos nuevos (modo incremental, segundos;
+    # docs/INE_CENSO2024.md). El recalculo completo lo hace el cargador del censo.
+    $urbanAreas = & $psql -h 127.0.0.1 -p $databasePort -U $databaseUser -d $databaseName `
+        -Atqc 'SELECT count(*) FROM seismic.urban_area_part'
+    if ($LASTEXITCODE -eq 0 -and [int]$urbanAreas -gt 0) {
+        Write-Host 'Zonas urbanas y poblacion cerca de los eventos nuevos (db/assign_urban_exposure.sql)'
+        & $psql -h 127.0.0.1 -p $databasePort -U $databaseUser -d $databaseName `
+            -v ON_ERROR_STOP=1 -v incremental=1 -f (Join-Path $projectRoot 'db\assign_urban_exposure.sql')
+        if ($LASTEXITCODE -ne 0) {
+            throw 'El calculo de exposicion urbana fallo; los eventos cargados se conservan.'
+        }
+    }
+    else {
+        Write-Host 'Censo 2024 no cargado: se omite la exposicion urbana (scripts\load_ine_manzanas_postgis.ps1).'
+    }
 }
 finally {
     Pop-Location
