@@ -19,6 +19,9 @@ scripts/*
 !scripts/start_local_postgis.ps1
 !scripts/stop_local_postgis.ps1
 !scripts/load_catalogs_postgis.ps1
+!scripts/load_dpa_postgis.ps1
+!scripts/validate_ml_conversion.py
+!scripts/load_ine_manzanas_postgis.ps1
 
 # Salidas geoespaciales y logs locales.
 *.gpkg

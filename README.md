@@ -36,15 +36,32 @@ La última carga validada durante el desarrollo contiene:
 
 Esta carga fue verificada el 2026-09-22. No es un contador en tiempo real: al volver a ejecutar los descargadores, los resultados pueden cambiar por nuevos eventos o revisiones de las fuentes. Un mismo sismo también puede aparecer una vez por fuente si fue publicado tanto por CSN como por USGS.
 
-La base ya cuenta con:
+Desde el 2026-11-06 la base también contiene la **División Político Administrativa 2023** (SUBDERE / IDE Chile): 16 regiones, 56 provincias y 345 comunas. Cada sismo quedó asignado a una comuna:
 
-- cinco tablas en el esquema `seismic`;
-- índices temporales, de magnitud y espaciales GiST;
-- carga transaccional con `UPSERT` mediante `(source_code, source_event_id)`;
+- 23.156 sismos tienen el epicentro dentro de una comuna (`covers`);
+- 34.375 están en el mar o fuera de Chile y se asignaron a la comuna más cercana (`nearest`), con su distancia en `distance_km`.
+
+Las fuentes publican magnitudes en escalas distintas (Mw convertida, magnitud local tipo Richter, `mb`...). Para comparar, 45.617 eventos (79 %) tienen además un **Mw homogéneo** (`mw_homogenized`), calculado con las fórmulas de conversión del propio CSN. Ver [`docs/MAGNITUDES.md`](docs/MAGNITUDES.md).
+
+Desde el 2026-11-07 la base contiene también las **zonas urbanas y la población del Censo 2024** (INE): 592 ciudades y pueblos y 216.341 manzanas. La comuna cubre todo su territorio (la de Calama mide 15.545 km² y su ciudad 37 km²), así que estas tablas dicen dónde vive la gente:
+
+- cada sismo tiene su zona urbana más cercana, con distancia al epicentro y al hipocentro;
+- cada sismo Mw ≥ 5 tiene todas las zonas urbanas a 200 km o menos y la población censada a 25, 50 y 100 km.
+
+Ver [`docs/INE_CENSO2024.md`](docs/INE_CENSO2024.md).
+
+La base cuenta con:
+
+- catorce tablas y una vista (`v_event_location`) en el esquema `seismic`;
+- jerarquía comuna → provincia → región en `administrative_area`;
+- catálogo de tipos de magnitud y fórmulas de conversión a Mw (`magnitude_type`, `magnitude_conversion`, `magnitude_conversion_rule`);
+- zonas urbanas, manzanas y su relación con los sismos (`urban_area`, `census_block`, `event_urban_area`, `event_population_exposure`);
+- índices temporales, de magnitud y espaciales GiST, más trozos de comuna (`ST_Subdivide`) para consultas rápidas;
+- carga transaccional e idempotente con `UPSERT`;
 - historial de cargas en `seismic.ingestion_run`;
-- consultas de ejemplo con `ST_Covers`, `ST_DWithin` y `ST_ClusterDBSCAN`.
+- 14 consultas básicas por región, comuna, distancia, profundidad, densidad, zona urbana y población en [`db/queries.sql`](db/queries.sql).
 
-La tabla `seismic.administrative_area` está preparada, pero los límites regionales todavía no forman parte de la carga automatizada. Importarlos y asignar cada epicentro a una región es el siguiente paso del proyecto.
+El modelo lógico v2, la carga de la DPA y el diseño de las próximas etapas (réplicas, intensidad USGS) están documentados en [`docs/MODELO_LOGICO_v2.md`](docs/MODELO_LOGICO_v2.md).
 
 ## Fuentes de datos
 
@@ -52,18 +69,34 @@ La tabla `seismic.administrative_area` está preparada, pero los límites region
 | --- | --- | --- |
 | [Centro Sismológico Nacional](https://www.sismologia.cl/) | CSV histórico más páginas diarias oficiales | El CSV llega al 2025-06-23 y las páginas diarias completan desde el 2025-06-24 hasta el día de ejecución |
 | [USGS ComCat](https://earthquake.usgs.gov/fdsnws/event/1/) | Eventos recientes dentro del rectángulo de Chile | Consulta bajo demanda; los eventos recientes pueden ser preliminares |
+| DPA 2023 (SUBDERE / IDE Chile) | Polígonos de regiones, provincias y comunas | Versión estática publicada el 2023-08-03; shapefile en SIRGAS-Chile (EPSG:5360) |
+| [Censo 2024, INE](https://censo2024.ine.gob.cl/resultados/) | Zonas urbanas y manzanas con población | Versión estática publicada el 2025-12-16; GeoParquet en SIRGAS 2000 (EPSG:4674) |
 
 El uso académico de los datos del CSN debe citar al **Centro Sismológico Nacional de la Universidad de Chile** y respetar sus [condiciones de uso](https://sismologia.cl/accesos/uso-de-datos.html).
+
+Todo mapa que muestre los límites de la DPA debe llevar la leyenda: *"Autorizada su circulación por Resolución Nº 87 del 2023 de la Dirección Nacional de Fronteras y Límites del Estado"*.
+
+Los datos del censo deben citarse como *Instituto Nacional de Estadísticas (INE), Censo de Población y Vivienda 2024, Base Cartográfica Censal*.
 
 ## Estructura del repositorio
 
 ```text
 .
 ├── db/
-│   ├── schema.sql                 # Modelo relacional y espacial
+│   ├── schema.sql                 # Modelo relacional y espacial (v2)
 │   ├── apply_schema.sql           # Creación y validación de la base
 │   ├── load_catalogs.sql          # Carga idempotente de CSN y USGS
-│   └── queries.sql                # Consultas espaciales de ejemplo
+│   ├── load_dpa.sql               # Carga de regiones, provincias y comunas
+│   ├── assign_event_areas.sql     # Asignación de cada sismo a una comuna
+│   ├── homogenize_magnitudes.sql  # Mw homogéneo de cada sismo
+│   ├── validate_ml_conversion.sql # Validación de la fórmula Ml -> Mw
+│   ├── load_census.sql            # Carga de zonas urbanas y manzanas (Censo 2024)
+│   ├── assign_urban_exposure.sql  # Zonas urbanas y población cerca de cada sismo
+│   └── queries.sql                # Consultas básicas
+├── docs/
+│   ├── MODELO_LOGICO_v2.md        # Modelo lógico, carga y próximas etapas
+│   ├── MAGNITUDES.md              # Escalas de magnitud y conversión a Mw
+│   └── INE_CENSO2024.md           # Zonas urbanas y población (Censo 2024)
 ├── scripts/
 │   ├── download_csn_catalog.py
 │   ├── download_usgs_earthquakes.py
@@ -71,7 +104,10 @@ El uso académico de los datos del CSN debe citar al **Centro Sismológico Nacio
 │   ├── run_usgs_earthquakes_qgis.cmd
 │   ├── start_local_postgis.ps1
 │   ├── stop_local_postgis.ps1
-│   └── load_catalogs_postgis.ps1
+│   ├── load_catalogs_postgis.ps1
+│   ├── load_dpa_postgis.ps1
+│   ├── load_ine_manzanas_postgis.ps1  # Carga del Censo 2024 (usa el GDAL de QGIS)
+│   └── validate_ml_conversion.py  # Descarga de datos para validar Ml -> Mw
 ├── data/earthquakes/README.md     # Diccionario y detalles de los productos
 ├── .env.example                   # Configuración local sin contraseña real
 ├── compose.yaml                   # Alternativa con Docker
@@ -165,7 +201,30 @@ PowerShell -ExecutionPolicy Bypass -File .\scripts\load_catalogs_postgis.ps1 `
   -UsgsCsv .\data\processed\usgs\usgs_earthquakes_chile_m2.5_20260801_20260830.csv
 ```
 
-### 5. Consultar o visualizar
+Al terminar, este script calcula el Mw homogéneo de cada evento; si la DPA ya está cargada, recalcula su comuna, y si el censo ya está cargado, calcula la zona urbana y la población cercanas de los eventos nuevos (modo incremental, segundos).
+
+### 5. Cargar la DPA y asignar comunas
+
+Requiere el zip oficial en `data\raw\chile_boundaries\dpa_2023.zip` (311 MB, no se versiona en Git).
+
+```powershell
+PowerShell -ExecutionPolicy Bypass -File .\scripts\load_dpa_postgis.ps1
+```
+
+El script extrae solo los shapefiles necesarios, los importa con `shp2pgsql`, los reproyecta de SIRGAS-Chile (EPSG:5360) a WGS 84 (EPSG:4326), valida geometrías y jerarquía, y asigna cada sismo a una comuna. Tarda unos dos minutos y puede repetirse sin duplicar datos.
+
+### 6. Cargar el Censo 2024 (zonas urbanas y población)
+
+Requiere la DPA cargada, QGIS 3.44 instalado (se usa su GDAL para leer GeoParquet) y el zip oficial del INE en `data\raw\ine\Cartografia_censo2024_Pais.zip` (758 MB, no se versiona en Git):
+
+```powershell
+curl.exe -L -o data\raw\ine\Cartografia_censo2024_Pais.zip "https://storage.googleapis.com/bktdescargascenso2024/Cartografia/GEOPARQUET/Cartografia_censo2024_Pais.zip"
+PowerShell -ExecutionPolicy Bypass -File .\scripts\load_ine_manzanas_postgis.ps1
+```
+
+Carga las zonas urbanas y las manzanas en ~30 s y luego calcula la cercanía de todos los sismos a las zonas urbanas y la población cercana en 10–12 minutos. Puede repetirse sin duplicar datos. Detalle en [`docs/INE_CENSO2024.md`](docs/INE_CENSO2024.md).
+
+### 7. Consultar o visualizar
 
 Las consultas preparadas están en [`db/queries.sql`](db/queries.sql). Por ejemplo:
 
@@ -191,8 +250,10 @@ Para conectar QGIS:
 | Base de datos | `sismos_chile` |
 | Usuario | `sismos_app` |
 | Contraseña | valor de `POSTGRES_PASSWORD` en `.env` |
-| Capa principal | `seismic.earthquake_event` |
-| Geometría | `geom` (`Point`, `EPSG:4326`) |
+| Capa principal | `seismic.v_event_location` (sismos con comuna, provincia y región) |
+| Límites | `seismic.administrative_area` filtrada por `level` (`region`, `province`, `commune`) |
+| Zonas urbanas | `seismic.urban_area` (ciudades y pueblos con población) |
+| Geometría | `geom` (`Point` o `MultiPolygon`, `EPSG:4326`) |
 
 Para detener la instancia local:
 
@@ -204,8 +265,9 @@ PowerShell -ExecutionPolicy Bypass -File .\scripts\stop_local_postgis.ps1
 
 - Las horas se normalizan a UTC y los epicentros se almacenan en WGS 84 (`EPSG:4326`).
 - La geometría es 2D; la profundidad hipocentral se conserva en `depth_km`.
-- Las magnitudes deben interpretarse junto con `magnitude_type`; no todas usan la misma escala o método.
+- `magnitude` es el valor publicado por la fuente y mezcla escalas: debe leerse junto con `magnitude_type`. Para filtrar o comparar se usa `mw_homogenized`. La conversión de `Ml` está validada y la de `Mlv` (desde 2026) es provisional. Para comparar el catálogo histórico con las páginas diarias conviene un umbral de Mw 4,5 ([`docs/MAGNITUDES.md`](docs/MAGNITUDES.md)).
 - La carga validada conserva 293 eventos sin profundidad y 15 profundidades negativas publicadas por la fuente, para permitir control de calidad sin alterar evidencia.
+- La población proviene del Censo 2024 y cubre manzanas urbanas y de aldea (87,6 % de la población censada). Describe a quienes hoy viven cerca de un epicentro; no es una estimación de daño.
 - El catálogo global de USGS puede omitir sismos pequeños detectados por redes locales.
 - Los eventos recientes pueden cambiar de magnitud, profundidad, ubicación o estado de revisión.
 - Las páginas diarias recientes del CSN se vuelven a descargar durante siete días para incorporar posibles revisiones.
