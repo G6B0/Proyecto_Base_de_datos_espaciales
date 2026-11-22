@@ -41,19 +41,14 @@ Todos los comandos se ejecutan en PowerShell, desde la carpeta del repositorio.
 
 ### Paso 1. Bajar el código nuevo
 
-El modelo v2 ya está en `main` (pull request [#1](https://github.com/G6B0/Proyecto_Base_de_datos_espaciales/pull/1)). Lo del Hito 2 está en el pull request [#2](https://github.com/G6B0/Proyecto_Base_de_datos_espaciales/pull/2); mientras no esté fusionado, el código está en la rama `feature/hito2-modelo-completo`:
-
-```powershell
-git fetch origin
-git checkout feature/hito2-modelo-completo
-```
-
-Cuando se fusione, basta con:
+Todo está en `main`: el modelo v2 (pull request [#1](https://github.com/G6B0/Proyecto_Base_de_datos_espaciales/pull/1)) y el Hito 2 (pull request [#2](https://github.com/G6B0/Proyecto_Base_de_datos_espaciales/pull/2)). Basta con:
 
 ```powershell
 git checkout main
 git pull
 ```
+
+Si tenías cambios locales sin commit, `git pull` puede negarse a seguir. En ese caso guárdalos con `git stash`, vuelve a correr `git pull` y recupéralos con `git stash pop`.
 
 ### Paso 2. Iniciar la base y aplicar el esquema nuevo
 
