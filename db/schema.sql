@@ -605,3 +605,159 @@ COMMENT ON TABLE seismic.event_urban_area IS
     'Zonas urbanas cercanas a cada sismo: la mas cercana siempre (rank 1); todas a <= 200 km si Mw >= 5. Distancia al borde de la zona (0 si el epicentro esta dentro).';
 COMMENT ON TABLE seismic.event_population_exposure IS
     'Poblacion y viviendas censadas (manzanas) a 25, 50 y 100 km del epicentro de cada sismo Mw >= 5. No es estimacion de dano.';
+
+
+-- ---------------------------------------------------------------------------
+-- Tablas de analisis (implementadas en el Hito 2; las pueblan los procesos de
+-- la entrega 3, salvo magnitude_estimate, que se llena con
+-- db/load_magnitude_estimates.sql a partir de las magnitudes ya cargadas).
+-- ---------------------------------------------------------------------------
+
+-- Todas las magnitudes publicadas de un evento (relacion 1:N). La preferida
+-- sigue en earthquake_event.magnitude; aqui se conservan tambien las demas.
+CREATE TABLE IF NOT EXISTS seismic.magnitude_estimate (
+    earthquake_event_id bigint NOT NULL
+        REFERENCES seismic.earthquake_event (earthquake_event_id) ON DELETE CASCADE,
+    magnitude_type_code text NOT NULL
+        REFERENCES seismic.magnitude_type (magnitude_type_code),
+    agency text NOT NULL,
+    magnitude_value numeric(4, 2) NOT NULL,
+    origin text NOT NULL CHECK (origin IN ('reported', 'converted')),
+    is_preferred boolean NOT NULL DEFAULT false,
+    PRIMARY KEY (earthquake_event_id, magnitude_type_code, agency)
+);
+
+CREATE INDEX IF NOT EXISTS magnitude_estimate_type_idx
+    ON seismic.magnitude_estimate (magnitude_type_code);
+
+-- A lo mas una magnitud preferida por evento.
+CREATE UNIQUE INDEX IF NOT EXISTS magnitude_estimate_preferred_uidx
+    ON seismic.magnitude_estimate (earthquake_event_id)
+    WHERE is_preferred;
+
+-- Emparejamiento CSN-USGS: dos registros que corresponden al mismo sismo.
+CREATE TABLE IF NOT EXISTS seismic.event_match (
+    csn_event_id bigint NOT NULL
+        REFERENCES seismic.earthquake_event (earthquake_event_id) ON DELETE CASCADE,
+    usgs_event_id bigint NOT NULL
+        REFERENCES seismic.earthquake_event (earthquake_event_id) ON DELETE CASCADE,
+    time_difference_s numeric(8, 2) NOT NULL CHECK (time_difference_s >= 0),
+    distance_km numeric(8, 2) NOT NULL CHECK (distance_km >= 0),
+    magnitude_difference numeric(4, 2),
+    match_score numeric(5, 4) NOT NULL CHECK (match_score BETWEEN 0 AND 1),
+    method text NOT NULL,
+    matched_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (csn_event_id, usgs_event_id),
+    CONSTRAINT event_match_distinct_check CHECK (csn_event_id <> usgs_event_id)
+);
+
+CREATE INDEX IF NOT EXISTS event_match_usgs_idx
+    ON seismic.event_match (usgs_event_id);
+
+-- Replicas: una ejecucion de un metodo de declustering con sus parametros.
+CREATE TABLE IF NOT EXISTS seismic.declustering_run (
+    declustering_run_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    method text NOT NULL
+        CHECK (method IN ('gardner_knopoff_1974', 'reasenberg_1985', 'zaliapin_2008')),
+    parameters jsonb NOT NULL DEFAULT '{}'::jsonb,
+    source_code text NOT NULL REFERENCES seismic.data_source (source_code),
+    magnitude_basis text NOT NULL DEFAULT 'mw_homogenized',
+    minimum_magnitude numeric(4, 2) NOT NULL,
+    period_start timestamptz,
+    period_end timestamptz,
+    executed_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT declustering_run_period_check
+        CHECK (period_start IS NULL OR period_end IS NULL OR period_start <= period_end)
+);
+
+-- Una secuencia: sismo principal con sus precursores y replicas.
+CREATE TABLE IF NOT EXISTS seismic.seismic_sequence (
+    seismic_sequence_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    declustering_run_id bigint NOT NULL
+        REFERENCES seismic.declustering_run (declustering_run_id) ON DELETE CASCADE,
+    mainshock_event_id bigint NOT NULL
+        REFERENCES seismic.earthquake_event (earthquake_event_id) ON DELETE CASCADE,
+    foreshock_count integer NOT NULL DEFAULT 0 CHECK (foreshock_count >= 0),
+    aftershock_count integer NOT NULL DEFAULT 0 CHECK (aftershock_count >= 0),
+    largest_aftershock_magnitude numeric(4, 2),
+    started_at timestamptz NOT NULL,
+    ended_at timestamptz NOT NULL,
+    footprint geometry(Polygon, 4326),
+    CONSTRAINT seismic_sequence_run_mainshock_unique
+        UNIQUE (declustering_run_id, mainshock_event_id),
+    CONSTRAINT seismic_sequence_time_check CHECK (started_at <= ended_at)
+);
+
+CREATE INDEX IF NOT EXISTS seismic_sequence_mainshock_idx
+    ON seismic.seismic_sequence (mainshock_event_id);
+
+CREATE INDEX IF NOT EXISTS seismic_sequence_footprint_gix
+    ON seismic.seismic_sequence USING gist (footprint);
+
+-- Rol de cada evento en una ejecucion de declustering.
+CREATE TABLE IF NOT EXISTS seismic.event_sequence_role (
+    declustering_run_id bigint NOT NULL
+        REFERENCES seismic.declustering_run (declustering_run_id) ON DELETE CASCADE,
+    earthquake_event_id bigint NOT NULL
+        REFERENCES seismic.earthquake_event (earthquake_event_id) ON DELETE CASCADE,
+    seismic_sequence_id bigint
+        REFERENCES seismic.seismic_sequence (seismic_sequence_id) ON DELETE CASCADE,
+    role text NOT NULL
+        CHECK (role IN ('mainshock', 'foreshock', 'aftershock', 'independent')),
+    time_from_mainshock interval,
+    distance_to_mainshock_km numeric(8, 2) CHECK (distance_to_mainshock_km >= 0),
+    PRIMARY KEY (declustering_run_id, earthquake_event_id),
+    CONSTRAINT event_sequence_role_sequence_check
+        CHECK ((role = 'independent') = (seismic_sequence_id IS NULL))
+);
+
+CREATE INDEX IF NOT EXISTS event_sequence_role_event_idx
+    ON seismic.event_sequence_role (earthquake_event_id);
+
+CREATE INDEX IF NOT EXISTS event_sequence_role_sequence_idx
+    ON seismic.event_sequence_role (seismic_sequence_id);
+
+-- Resumen de impacto publicado por USGS (un registro por evento que lo tenga).
+CREATE TABLE IF NOT EXISTS seismic.event_impact_summary (
+    earthquake_event_id bigint PRIMARY KEY
+        REFERENCES seismic.earthquake_event (earthquake_event_id) ON DELETE CASCADE,
+    max_mmi numeric(3, 1) CHECK (max_mmi BETWEEN 1 AND 12),
+    max_cdi numeric(3, 1) CHECK (max_cdi BETWEEN 1 AND 12),
+    pager_alert text CHECK (pager_alert IN ('green', 'yellow', 'orange', 'red')),
+    has_shakemap boolean NOT NULL DEFAULT false,
+    has_dyfi boolean NOT NULL DEFAULT false,
+    has_losspager boolean NOT NULL DEFAULT false,
+    detail_url text,
+    retrieved_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Contornos de intensidad ShakeMap como poligonos.
+CREATE TABLE IF NOT EXISTS seismic.shakemap_contour (
+    shakemap_contour_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    earthquake_event_id bigint NOT NULL
+        REFERENCES seismic.earthquake_event (earthquake_event_id) ON DELETE CASCADE,
+    metric text NOT NULL CHECK (metric IN ('mmi', 'pga', 'pgv')),
+    contour_value numeric(6, 2) NOT NULL,
+    shakemap_version text NOT NULL DEFAULT '',
+    geom geometry(MultiPolygon, 4326) NOT NULL,
+    CONSTRAINT shakemap_contour_unique
+        UNIQUE (earthquake_event_id, metric, contour_value, shakemap_version)
+);
+
+CREATE INDEX IF NOT EXISTS shakemap_contour_geom_gix
+    ON seismic.shakemap_contour USING gist (geom);
+
+COMMENT ON TABLE seismic.magnitude_estimate IS
+    'Todas las magnitudes publicadas de cada evento (1:N): la original (reported) y la convertida por la fuente (converted). La preferida queda marcada con is_preferred.';
+COMMENT ON TABLE seismic.event_match IS
+    'Pares CSN-USGS que corresponden al mismo sismo. Se llena en la entrega 3 (regla propuesta: menos de 60 s y 100 km).';
+COMMENT ON TABLE seismic.declustering_run IS
+    'Una ejecucion de un metodo de declustering (Gardner-Knopoff, Reasenberg, Zaliapin) con sus parametros. Se llena en la entrega 3.';
+COMMENT ON TABLE seismic.seismic_sequence IS
+    'Secuencias sismicas: sismo principal, cantidad de precursores y replicas, duracion y zona (footprint). Se llena en la entrega 3.';
+COMMENT ON TABLE seismic.event_sequence_role IS
+    'Rol de cada sismo (principal, precursor, replica o independiente) en una ejecucion de declustering. Se llena en la entrega 3.';
+COMMENT ON TABLE seismic.event_impact_summary IS
+    'Intensidad maxima (MMI, CDI) y alerta PAGER publicadas por USGS. Se llena en la entrega 3.';
+COMMENT ON TABLE seismic.shakemap_contour IS
+    'Contornos de intensidad ShakeMap de USGS como MultiPolygon. Se llena en la entrega 3.';

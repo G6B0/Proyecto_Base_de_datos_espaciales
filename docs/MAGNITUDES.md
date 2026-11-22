@@ -1,7 +1,7 @@
 # Magnitudes sísmicas: qué es cada una y cómo las usamos
 
 > Documento de apoyo del modelo lógico v2 ([MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md), secciones 4.5 y 5.3.1).
-> Escrito el 2026-11-06. Todas las cifras salen de la base `sismos_chile` (57.531 eventos cargados) salvo que se indique otra fuente.
+> Escrito el 2026-11-06. Todas las cifras salen de la base `sismos_chile` (57.531 eventos cargados ese día) salvo que se indique otra fuente. Actualizado el 2026-11-22: el estado del punto 6 y `magnitude_estimate` (sección 9.2) están al 11-11-2026, con 59.534 eventos.
 >
 > Etiquetas: **[DATO]** = verificado en nuestra base · **[TEORÍA]** = definición sismológica estándar · **[DECISIÓN]** = elección nuestra, con su justificación.
 
@@ -17,7 +17,7 @@
    - **USGS "M≥4":** es la magnitud *preferida* de USGS, que en el 69 % de los casos es `mb`. Un `mb` 4,0 equivale a un **Mw ≈ 3,9**.
 4. **¿Lo arreglamos?** Sí. Agregamos `mw_homogenized`: un Mw para cada evento donde se puede estimar con una fórmula confiable, más una columna `mw_method` que dice cómo se obtuvo. Las fórmulas **no las inventamos**: las reconstruimos desde el propio catálogo del CSN (sección 6).
 5. **Regla práctica:** para comparar períodos o fuentes, usar `mw_homogenized >= 4.5`. Entre 4,0 y 4,5 el catálogo histórico trae muchos más sismos, pero **no por la escala**: integra boletines internacionales que las páginas diarias no publican (secciones 8 y 10).
-6. **Estado [IMPLEMENTADO]:** 45.617 de 57.531 eventos (79 %) tienen `mw_homogenized`. Esto incluye casi todos los que tienen M ≥ 4. Los que quedan sin Mw son sismos chicos de las páginas diarias, que conservan su `Ml` original.
+6. **Estado [IMPLEMENTADO]:** con los datos al 11-11-2026, 45.835 de 59.534 eventos (77 %) tienen `mw_homogenized`. Esto incluye casi todos los que tienen M ≥ 4. Los que quedan sin Mw son sismos chicos de las páginas diarias, que conservan su `Ml` original.
 7. **Validación (sección 10):**
    - **La fórmula para `Ml` quedó validada.** El `Ml` de las páginas diarias es el mismo `ML` que el CSN convertía, y la fórmula reproduce su Mw con un error medio de +0,008.
    - **`Mlv` sigue provisional.** Es coherente en promedio, pero hay indicios de que da ~0,1 más alto.
@@ -382,7 +382,7 @@ erDiagram
 
 El costo de esta regla son los 3 `Ml` sobre 5,4 de las páginas diarias, que quedan sin Mw. La validación de la sección 10 solo tuvo pares hasta `Ml` 5,3, así que no justifica ampliar el rango. Si más adelante hubiera evidencia, bastaría un `UPDATE` a `magnitude_conversion` y volver a ejecutar el script.
 
-**[DECISIÓN] Por qué `magnitude_estimate` sigue [DISEÑADO].** Hoy cada evento trae como máximo dos magnitudes (la preferida y la original), y ya están en `earthquake_event`. Crear la tabla 1:N ahora solo duplicaría esas columnas. Se implementará cuando la descarga completa de USGS traiga varias magnitudes por evento (por ejemplo `mb` y `Mww` del mismo sismo).
+**[DECISIÓN] `magnitude_estimate` [IMPLEMENTADO] desde el 2026-11-12.** Hasta el 11-11 estaba solo diseñada, porque cada evento trae como máximo dos magnitudes (la preferida y la original) y ya están en `earthquake_event`. Se creó para dejar el modelo lógico completo en el Hito 2. La llena [`db/load_magnitude_estimates.sql`](../db/load_magnitude_estimates.sql) con la magnitud preferida de cada evento y, si es distinta, la original; tiene 104.225 filas al 11-11-2026. Cuando la descarga completa de USGS traiga varias magnitudes por evento (por ejemplo `mb` y `Mww` del mismo sismo), entrarán como filas nuevas.
 
 ### 9.3 Cómo se calcula
 

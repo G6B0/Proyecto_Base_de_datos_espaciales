@@ -22,6 +22,12 @@ scripts/*
 !scripts/load_dpa_postgis.ps1
 !scripts/validate_ml_conversion.py
 !scripts/load_ine_manzanas_postgis.ps1
+!scripts/build_qgis_project.py
+!scripts/build_drawio_model.py
+
+# Respaldos de QGIS y carpetas temporales de herramientas.
+*.qgs~
+.codex_tmp/
 
 # Salidas geoespaciales y logs locales.
 *.gpkg

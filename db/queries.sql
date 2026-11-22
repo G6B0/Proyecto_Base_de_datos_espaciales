@@ -282,3 +282,35 @@ WHERE location.assignment_method = 'covers'
 GROUP BY location.commune_name, commune.administrative_area_id, commune.official_area_km2
 ORDER BY mw5_inside_commune DESC
 LIMIT 10;
+
+
+-- 15. Actividad sismica de una comuna en una ventana de tiempo:
+-- sismos con epicentro en la comuna de Calama en los ultimos 3 meses de
+-- datos, por mes. La ventana termina en el sismo mas reciente cargado (no en
+-- now()), para que el resultado no dependa del dia en que se ejecuta.
+-- Cambiando comuna y ventana sirve para cualquier comuna y periodo.
+WITH params AS (
+    SELECT 'Calama'::text AS comuna, interval '3 months' AS ventana
+),
+bounds AS (
+    SELECT params.comuna,
+           max(event.occurred_at) - params.ventana AS desde,
+           max(event.occurred_at) AS hasta
+    FROM seismic.earthquake_event AS event
+    CROSS JOIN params
+    GROUP BY params.comuna, params.ventana
+)
+SELECT
+    coalesce(to_char(date_trunc('month', location.occurred_at AT TIME ZONE 'UTC'), 'YYYY-MM'), 'Total') AS mes,
+    count(*) AS sismos,
+    count(*) FILTER (WHERE location.source_code = 'usgs') AS de_usgs,
+    count(*) FILTER (WHERE location.mw_homogenized >= 4) AS mw4_o_mas,
+    max(location.mw_homogenized) AS mw_max,
+    round(avg(location.depth_km)) AS profundidad_media_km
+FROM seismic.v_event_location AS location
+JOIN bounds ON location.commune_name = bounds.comuna
+WHERE location.assignment_method = 'covers'
+  AND location.occurred_at > bounds.desde
+  AND location.occurred_at <= bounds.hasta
+GROUP BY ROLLUP (date_trunc('month', location.occurred_at AT TIME ZONE 'UTC'))
+ORDER BY date_trunc('month', location.occurred_at AT TIME ZONE 'UTC') NULLS LAST;
