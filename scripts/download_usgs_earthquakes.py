@@ -3,6 +3,17 @@
 The script keeps the original GeoJSON response for provenance and creates a
 two-dimensional GeoJSON plus CSV for QGIS/PostGIS. Depth is stored as an
 attribute because USGS encodes it as the third GeoJSON coordinate.
+
+Each event also keeps its impact summary as published in the regular API
+response (no per-event requests): maximum ShakeMap intensity (mmi), maximum
+"Did You Feel It?" intensity (cdi), PAGER alert level and the list of
+products (shakemap, dyfi, losspager...). db/load_catalogs.sql uses them to
+fill seismic.event_impact_summary.
+
+Full catalog used in the final delivery (about 31,000 events, M >= 4 since
+1900; the API limit of 20,000 is handled by splitting the time range):
+
+    scripts\\run_usgs_earthquakes_qgis.cmd --start 1900-01-01 --min-magnitude 4
 """
 
 from __future__ import annotations
@@ -40,10 +51,15 @@ def iso_utc(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
 def timestamp_ms_to_iso(value: int | float | None) -> str | None:
     if value is None:
         return None
-    return iso_utc(datetime.fromtimestamp(value / 1000, tz=timezone.utc))
+    # datetime.fromtimestamp rejects negative values on Windows, and the
+    # catalog goes back to 1900.
+    return iso_utc(UNIX_EPOCH + timedelta(milliseconds=value))
 
 
 def request_text(path: str, parameters: dict[str, Any]) -> tuple[str, str]:
@@ -143,6 +159,11 @@ def normalize_feature(feature: dict[str, Any]) -> dict[str, Any]:
     latitude = float(coordinates[1])
     depth_km = float(coordinates[2]) if len(coordinates) > 2 else None
 
+    # USGS lists products as ",origin,shakemap,dyfi,"; keep "origin,shakemap,dyfi".
+    product_types = ",".join(
+        product for product in str(properties.get("types") or "").split(",") if product
+    )
+
     normalized_properties = {
         "source": "USGS ComCat",
         "source_event_id": event_id,
@@ -168,6 +189,11 @@ def normalize_feature(feature: dict[str, Any]) -> dict[str, Any]:
         "magnitude_source": properties.get("magSource"),
         "event_type": properties.get("type"),
         "source_url": properties.get("url"),
+        "mmi": properties.get("mmi"),
+        "cdi": properties.get("cdi"),
+        "alert": properties.get("alert"),
+        "product_types": product_types,
+        "detail_url": properties.get("detail"),
     }
     return {
         "type": "Feature",
@@ -325,7 +351,14 @@ def main() -> None:
             "Recent events may be preliminary and can be revised or deleted.",
             "Processed geometry is 2D; depth is stored separately in depth_km.",
             "Magnitude values preserve the original USGS magnitude type.",
+            "mmi, cdi and alert are the maximum ShakeMap intensity, maximum "
+            "DYFI intensity and PAGER alert published by USGS; product_types "
+            "lists the products available for each event.",
         ],
+        "events_with_shakemap": sum(
+            "shakemap" in feature["properties"]["product_types"].split(",")
+            for feature in normalized
+        ),
     }
 
     paths = write_outputs(normalized, deduplicated_raw, output_stem, metadata)

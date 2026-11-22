@@ -35,6 +35,27 @@ El esquema pasó de 9 a 21 tablas (14 con datos y 7 de análisis), y `db/queries
 
 ---
 
+## Atajo: restaurar el respaldo de Gabriel (entrega 3)
+
+En vez de los pasos 3 a 6 (unos 20 minutos y dos zips de 1 GB), puedes restaurar el respaldo que te pasa Gabriel por Drive. Trae la base completa al 22-11-2026: los sismos CSN, el **catálogo completo de USGS** (31.007 sismos, con su resumen de impacto), la DPA, el censo y todos los cálculos. Pesa 539 MB y se restaura en menos de un minuto.
+
+1. Haz el paso 1 (bajar el código) y el paso 2 (iniciar la base) de la sección 3.
+2. Copia el archivo `sismos_chile_seismic_20261122.dump` en la carpeta del repositorio (ya está ignorado por Git).
+3. Ejecuta esto desde la carpeta del repositorio. **Borra el esquema `seismic` de tu base** (tus sismos, comunas y censo) y lo reemplaza por el del respaldo:
+
+```powershell
+$env:PGPASSWORD = ((Get-Content .env | Where-Object { $_ -like 'POSTGRES_PASSWORD=*' }) -replace '^POSTGRES_PASSWORD=', '').Trim()
+$bin = 'C:\Program Files\PostgreSQL\18\bin'
+& "$bin\psql.exe" -h 127.0.0.1 -p 5433 -U sismos_app -d sismos_chile -c "DROP SCHEMA IF EXISTS seismic CASCADE;"
+& "$bin\pg_restore.exe" -h 127.0.0.1 -p 5433 -U sismos_app -d sismos_chile --no-owner --jobs=4 .\sismos_chile_seismic_20261122.dump
+```
+
+4. Revisa con el paso 7. En la base restaurada deberías ver 90.352 sismos, 216.341 manzanas y 5.321 filas en `event_impact_summary`.
+
+Si tu usuario, base o puerto en `.env` no son `sismos_app`, `sismos_chile` y `5433`, cámbialos en los comandos. Se probó restaurando en una base vacía con PostGIS: mismos conteos en todas las tablas.
+
+---
+
 ## 3. Pasos
 
 Todos los comandos se ejecutan en PowerShell, desde la carpeta del repositorio.

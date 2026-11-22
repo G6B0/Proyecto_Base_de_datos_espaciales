@@ -29,6 +29,9 @@ scripts/*
 *.qgs~
 .codex_tmp/
 
+# Respaldos de la base (pg_dump): se comparten por Drive, no por Git.
+*.dump
+
 # Salidas geoespaciales y logs locales.
 *.gpkg
 *.tif

@@ -30,11 +30,11 @@ La última carga validada durante el desarrollo contiene:
 
 | Fuente | Eventos | Cobertura del catálogo cargado |
 | --- | ---: | --- |
-| CSN | 57.488 | 1513-01-01 a 2026-09-22 14:40:50 UTC |
-| USGS | 42 | Ventana 2026-08-01 a 2026-08-30; el último evento observado fue del 2026-08-29 |
-| **Total** | **57.530** | Identificadores únicos por fuente y geometrías válidas |
+| CSN | 59.345 | 1513-01-01 a 2026-11-11 21:50 UTC |
+| USGS | 31.007 | Catálogo completo M ≥ 4 desde 1904 hasta el 2026-11-22, más la muestra reciente M ≥ 2,5 (agosto a noviembre de 2026) |
+| **Total** | **90.352** | Identificadores únicos por fuente y geometrías válidas |
 
-Esta carga fue verificada el 2026-09-22. No es un contador en tiempo real: al volver a ejecutar los descargadores, los resultados pueden cambiar por nuevos eventos o revisiones de las fuentes. Un mismo sismo también puede aparecer una vez por fuente si fue publicado tanto por CSN como por USGS.
+Esta carga fue verificada el 2026-11-22. De los sismos USGS, 5.321 tienen resumen de impacto en `event_impact_summary`: 1.165 con ShakeMap, 4.594 con intensidad reportada por la gente (DYFI) y 384 con alerta PAGER. **Hasta llenar `event_match`, las consultas que mezclan fuentes cuentan dos veces los sismos que publican el CSN y el USGS** ([`docs/PLAN_ENTREGA3.md`](docs/PLAN_ENTREGA3.md), paso 2). Las cifras de comunas, magnitudes y censo de los párrafos siguientes son las del Hito 2, antes de cargar el USGS completo. No es un contador en tiempo real: al volver a ejecutar los descargadores, los resultados pueden cambiar por nuevos eventos o revisiones de las fuentes. Un mismo sismo también puede aparecer una vez por fuente si fue publicado tanto por CSN como por USGS.
 
 Desde el 2026-11-06 la base también contiene la **División Político Administrativa 2023** (SUBDERE / IDE Chile): 16 regiones, 56 provincias y 345 comunas. Cada sismo quedó asignado a una comuna:
 
@@ -177,10 +177,18 @@ Eventos USGS de los últimos 30 días:
 .\scripts\run_usgs_earthquakes_qgis.cmd
 ```
 
-Para reproducir la muestra validada:
+Catálogo completo usado en la entrega final (M ≥ 4 desde 1900, unos 31.000 sismos; el descargador divide la consulta porque la API entrega como máximo 20.000 por pedido):
 
 ```powershell
-.\scripts\run_usgs_earthquakes_qgis.cmd --start 2026-08-01 --end 2026-08-30 --min-magnitude 2.5
+.\scripts\run_usgs_earthquakes_qgis.cmd --start 1900-01-01 --min-magnitude 4
+```
+
+Además de la ubicación y la magnitud, cada sismo trae su resumen de impacto: intensidad máxima del ShakeMap (`mmi`), intensidad reportada por la gente (`cdi`), alerta PAGER (`alert`) y los productos disponibles (`product_types`). El cargador los guarda en `seismic.event_impact_summary`.
+
+Para reproducir la muestra reciente del Hito 2:
+
+```powershell
+.\scripts\run_usgs_earthquakes_qgis.cmd --start 2026-08-01 --end 2026-11-11 --min-magnitude 2.5
 ```
 
 El rectángulo predeterminado es longitud `-76` a `-66` y latitud `-56` a `-17`. Incluye Chile continental, zonas oceánicas y algunos sectores limítrofes; la clasificación definitiva debe hacerse con límites administrativos en PostGIS.
@@ -191,17 +199,17 @@ El rectángulo predeterminado es longitud `-76` a `-66` y latitud `-56` a `-17`.
 PowerShell -ExecutionPolicy Bypass -File .\scripts\load_catalogs_postgis.ps1
 ```
 
-El cargador usa el CSV del CSN y el CSV de USGS más reciente. Volver a ejecutarlo actualiza los eventos existentes sin duplicarlos.
+El cargador usa el CSV del CSN y **todos** los CSV de USGS de `data\processed\usgs\` (por ejemplo, la muestra reciente y el catálogo completo). Si un sismo aparece en varios, se queda con su versión más nueva. Volver a ejecutarlo actualiza los eventos existentes sin duplicarlos. Los CSV de USGS descargados antes de la entrega 3 no traen las columnas de impacto; se cargan igual, sin resumen de impacto.
 
-También se pueden indicar archivos concretos:
+También se pueden indicar archivos concretos (`-UsgsCsv` acepta varios, separados por coma):
 
 ```powershell
 PowerShell -ExecutionPolicy Bypass -File .\scripts\load_catalogs_postgis.ps1 `
   -CsnCsv .\data\processed\csn\csn_earthquake_catalog.csv `
-  -UsgsCsv .\data\processed\usgs\usgs_earthquakes_chile_m2.5_20260801_20260830.csv
+  -UsgsCsv .\data\processed\usgs\usgs_earthquakes_chile_m4_19000101_20261122.csv
 ```
 
-Al terminar, este script calcula el Mw homogéneo de cada evento; si la DPA ya está cargada, recalcula su comuna, y si el censo ya está cargado, calcula la zona urbana y la población cercanas de los eventos nuevos (modo incremental, segundos).
+Al terminar, este script calcula el Mw homogéneo de cada evento y registra sus magnitudes en `magnitude_estimate`; si la DPA ya está cargada, recalcula su comuna, y si el censo ya está cargado, calcula la zona urbana y la población cercanas de los eventos nuevos (modo incremental, segundos).
 
 ### 5. Cargar la DPA y asignar comunas
 
