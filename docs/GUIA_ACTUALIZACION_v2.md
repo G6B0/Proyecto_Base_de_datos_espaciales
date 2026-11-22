@@ -1,10 +1,10 @@
 # Guía para actualizar tu base al modelo v2
 
 **Para:** Ignacio  
-**Fecha:** 2026-11-07  
+**Fecha:** 2026-11-07 (actualizada el 2026-11-22 con lo del Hito 2)  
 **Punto de partida:** ya tienes funcionando lo de la primera entrega: el clúster local en el puerto 5433, el `.env` y los sismos del CSN y USGS cargados.
 
-Esta guía explica cómo poner tu base al día con lo que hicimos el 6 y el 7 de noviembre, sin borrar lo que ya tienes. Son unos 20 minutos de ejecución, casi todo esperando.
+Esta guía explica cómo poner tu base al día con lo que hicimos entre el 6 y el 12 de noviembre, sin borrar lo que ya tienes. Son unos 20 minutos de ejecución, casi todo esperando.
 
 ---
 
@@ -15,8 +15,9 @@ Esta guía explica cómo poner tu base al día con lo que hicimos el 6 y el 7 de
 | **DPA 2023** (SUBDERE / IDE Chile) | 16 regiones, 56 provincias y 345 comunas oficiales. Cada sismo queda asignado a una comuna, o al mar con su comuna más cercana. | [MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md), sección 7 |
 | **Magnitudes homogéneas** | La columna `mw_homogenized`: convierte `Ml`, `Mlv`, `mb`, etc. a Mw para comparar sismos entre sí. Es la que se usa para filtrar "Mw ≥ 5". | [MAGNITUDES.md](MAGNITUDES.md) |
 | **Censo 2024** (tu parte) | 592 zonas urbanas y 216.341 manzanas con población. Para cada sismo, la zona urbana más cercana; para cada sismo Mw ≥ 5, la población a 25, 50 y 100 km. | [INE_CENSO2024.md](INE_CENSO2024.md) |
+| **Tablas de análisis** (12-11) | Las 7 tablas de la entrega 3 (réplicas, emparejamiento CSN–USGS, intensidad). Solo `magnitude_estimate` tiene datos; las demás quedan vacías. | [MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md), sección 5.3 |
 
-El esquema pasó de 9 a 14 tablas, y `db/queries.sql` pasó de 10 a 14 consultas.
+El esquema pasó de 9 a 21 tablas (14 con datos y 7 de análisis), y `db/queries.sql` pasó de 10 a 15 consultas.
 
 **Sobre tu script del INE:** lo integramos como `scripts/load_ine_manzanas_postgis.ps1`. La idea es la misma (usa el GDAL de QGIS para leer GeoParquet y `ogr2ogr` para cargarlo), pero ahora además pasa los datos de `ine_staging` a tablas del modelo y calcula la cercanía de los sismos. Las correcciones están en [INE_CENSO2024.md](INE_CENSO2024.md), sección 9.
 
@@ -40,11 +41,11 @@ Todos los comandos se ejecutan en PowerShell, desde la carpeta del repositorio.
 
 ### Paso 1. Bajar el código nuevo
 
-Mientras el pull request [#1](https://github.com/G6B0/Proyecto_Base_de_datos_espaciales/pull/1) no esté fusionado, el código está en la rama `feature/modelo-v2-dpa-magnitudes-censo`:
+El modelo v2 ya está en `main` (pull request [#1](https://github.com/G6B0/Proyecto_Base_de_datos_espaciales/pull/1)). Lo del Hito 2 está en el pull request [#2](https://github.com/G6B0/Proyecto_Base_de_datos_espaciales/pull/2); mientras no esté fusionado, el código está en la rama `feature/hito2-modelo-completo`:
 
 ```powershell
 git fetch origin
-git checkout feature/modelo-v2-dpa-magnitudes-censo
+git checkout feature/hito2-modelo-completo
 ```
 
 Cuando se fusione, basta con:
@@ -60,7 +61,7 @@ git pull
 PowerShell -ExecutionPolicy Bypass -File .\scripts\start_local_postgis.ps1
 ```
 
-Es el mismo script de siempre. Al iniciar aplica `db/schema.sql`, que crea las tablas y columnas nuevas **sin borrar tus sismos**: todo usa `IF NOT EXISTS`. Lo probé hoy sobre una base con el esquema de la primera entrega y quedan las 14 tablas con los sismos intactos. Es normal que aparezcan muchos `NOTICE: ... already exists, skipping`.
+Es el mismo script de siempre. Al iniciar aplica `db/schema.sql`, que crea las tablas y columnas nuevas **sin borrar tus sismos**: todo usa `IF NOT EXISTS`. Lo probé sobre una base con el esquema de la primera entrega y quedan las 21 tablas con los sismos intactos. Es normal que aparezcan muchos `NOTICE: ... already exists, skipping`.
 
 ### Paso 3. Conseguir los dos zips oficiales
 
@@ -95,7 +96,7 @@ Después, siempre:
 PowerShell -ExecutionPolicy Bypass -File .\scripts\load_catalogs_postgis.ps1
 ```
 
-Recarga los CSV sin duplicar eventos y luego calcula el Mw homogéneo. Tarda menos de un minuto. Como todavía no hay DPA ni censo, se salta esos dos cálculos.
+Recarga los CSV sin duplicar eventos, calcula el Mw homogéneo y llena `magnitude_estimate`. Tarda menos de un minuto. Como todavía no hay DPA ni censo, se salta esos dos cálculos.
 
 ### Paso 5. Cargar la DPA y asignar comunas
 
@@ -148,30 +149,34 @@ $env:PGCLIENTENCODING = 'UTF8'
 
 Qué deberías ver:
 
-| Control | En mi base (07-11) | Qué revisar en la tuya |
+| Control | En mi base (datos al 11-11) | Qué revisar en la tuya |
 |---|---:|---|
 | Regiones / provincias / comunas | 16 / 56 / 345 | Tiene que ser **igual**. |
 | Zonas urbanas | 592 | **Igual.** |
 | Manzanas | 216.341 | **Igual.** |
-| Sismos | 57.531 | Puede variar según la fecha de tus CSV. |
-| Sismos con Mw homogéneo | 45.617 (79 %) | Cerca del 79 % de tus sismos. Si es 0, no corriste el paso 4. |
-| Sismos con comuna o mar | 57.531 | **Igual a tu número de sismos.** |
-| Sismos con zona urbana más cercana | 57.531 | **Igual a tu número de sismos.** |
-| Sismos Mw ≥ 5 / con población | 6.388 / 6.388 | **Los dos números iguales entre sí.** |
+| Sismos | 59.534 | Puede variar según la fecha de tus CSV. |
+| Sismos con Mw homogéneo | 45.835 (77 %) | Cerca del 77 % de tus sismos. Si es 0, no corriste el paso 4. |
+| Sismos con comuna o mar | 59.534 | **Igual a tu número de sismos.** |
+| Sismos con zona urbana más cercana | 59.534 | **Igual a tu número de sismos.** |
+| Sismos Mw ≥ 5 / con población | 6.403 / 6.403 | **Los dos números iguales entre sí.** |
 
-Después puedes correr las 14 consultas:
+Si además quieres revisar `magnitude_estimate`, en mi base tiene 104.225 filas: `SELECT count(*) FROM seismic.magnitude_estimate;`. Las otras seis tablas de análisis tienen que estar vacías.
+
+Después puedes correr las 15 consultas:
 
 ```powershell
 & 'C:\Program Files\PostgreSQL\18\bin\psql.exe' -h 127.0.0.1 -p 5433 -U sismos_app -d sismos_chile -f db\queries.sql
 ```
 
-Las consultas nuevas son la 11 a la 14 (zona urbana más cercana, población cercana, ciudades con más sismos y comuna versus ciudad). Sus resultados están explicados en [INE_CENSO2024.md](INE_CENSO2024.md), sección 6.
+Las consultas nuevas son la 11 a la 15 (zona urbana más cercana, población cercana, ciudades con más sismos, comuna versus ciudad y actividad de una comuna en el tiempo). Sus resultados están explicados en [MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md), sección 8.
 
 ---
 
 ## 4. Capas nuevas en QGIS
 
-La conexión es la misma de antes (127.0.0.1, puerto 5433, `sismos_chile`, `sismos_app`). Las capas que sirven ahora:
+La forma más rápida es abrir `qgis/sismos_chile_v2.qgs`: ya trae las capas, los estilos y los marcadores. QGIS te pedirá la contraseña de `.env` (el proyecto no la guarda).
+
+Si prefieres armarlo a mano, la conexión es la misma de antes (127.0.0.1, puerto 5433, `sismos_chile`, `sismos_app`). Las capas que sirven ahora:
 
 | Capa | Para qué |
 |---|---|
@@ -196,8 +201,9 @@ PowerShell -ExecutionPolicy Bypass -File .\scripts\load_catalogs_postgis.ps1
 `load_catalogs_postgis.ps1` ahora hace solo, en este orden:
 
 1. Calcula el Mw homogéneo.
-2. Asigna la comuna.
-3. Calcula la zona urbana y la población cercanas, **solo de los sismos nuevos**. Tarda segundos.
+2. Llena `magnitude_estimate`.
+3. Asigna la comuna.
+4. Calcula la zona urbana y la población cercanas, **solo de los sismos nuevos**. Tarda segundos.
 
 Antes de una entrega conviene repetir el paso 6 completo, porque el modo rápido no detecta sismos antiguos a los que la fuente les corrigió la ubicación.
 
@@ -225,6 +231,6 @@ Si la base quedó en un estado raro y prefieres partir de cero, detén el clúst
 ## 7. Para leer después
 
 - [README.md](../README.md): instalación completa desde cero.
-- [MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md): modelo lógico con las 14 tablas, decisiones y calendario hasta la entrega final.
+- [MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md): modelo lógico con las 21 tablas, decisiones y calendario hasta la entrega final. El diagrama está en `docs/modelo_logico.drawio` (se abre en [app.diagrams.net](https://app.diagrams.net/)).
 - [INE_CENSO2024.md](INE_CENSO2024.md): todo lo del censo (tu parte): datos, método de distancia, resultados y limitaciones.
 - [MAGNITUDES.md](MAGNITUDES.md): por qué hay que homogeneizar magnitudes y cómo se validó la fórmula.

@@ -2,7 +2,7 @@
 
 **Proyecto:** Sistema espacial de sismicidad en Chile
 **Equipo:** Gabriel Huerta, Ignacio Barría
-**Fecha del documento:** 2026-11-06 (zonas urbanas y población agregadas el 2026-11-07)
+**Fecha del documento:** 2026-11-06 (zonas urbanas y población agregadas el 2026-11-07; tablas de análisis, consulta 15 y cifras con datos al 11-11-2026 actualizadas el 2026-11-22)
 **Entrega a la que apoya:** Proyecto 2, "Representación de datos y visualización" (9-11-2026)
 
 Este documento explica **qué cambió en el modelo de datos después del Hito 1, por qué cambió, cómo se cargaron los datos y qué queda para las etapas siguientes**. Está escrito para que cualquiera de los dos integrantes pueda reconstruir el razonamiento sin haber estado en la sesión de trabajo.
@@ -34,10 +34,11 @@ Cada tabla y cada idea lleva una de estas dos etiquetas:
 
 | Etiqueta | Significado |
 |---|---|
-| **[IMPLEMENTADO]** | Existe en `db/schema.sql`, está creada en la base y tiene datos cargados al 2026-11-07. |
-| **[DISEÑADO]** | Está especificada aquí, pero todavía **no existe** en la base. Es trabajo de las etapas siguientes (sección 11). |
+| **[IMPLEMENTADO]** | Existe en `db/schema.sql`, está creada en la base y tiene datos cargados al 2026-11-11. |
+| **[CREADA, SIN DATOS]** | La tabla existe en la base con sus llaves, restricciones e índices, pero la llenan los procesos de la entrega 3 (sección 11). |
+| **[PENDIENTE]** | Proceso o análisis que todavía no está implementado. |
 
-Esta distinción importa para el informe y la presentación: la Entrega 2 exige mostrar **datos ingresados y consultas funcionando**, así que solo se puede afirmar como hecho lo marcado **[IMPLEMENTADO]**. Lo **[DISEÑADO]** se presenta como "diseño del modelo para las próximas etapas".
+Esta distinción importa para el informe y la presentación: la Entrega 2 exige mostrar **datos ingresados y consultas funcionando**, así que solo se puede afirmar como hecho lo marcado **[IMPLEMENTADO]**. Las tablas **[CREADA, SIN DATOS]** se presentan como "modelo completo, listo para los análisis de la entrega 3". Hasta el 2026-11-11 estas tablas estaban solo diseñadas en este documento; desde el 2026-11-12 existen en la base.
 
 Archivos del repositorio que se mencionan:
 
@@ -48,12 +49,15 @@ Archivos del repositorio que se mencionan:
 | `db/load_dpa.sql` + `scripts/load_dpa_postgis.ps1` | **Nuevos.** Cargan regiones, provincias y comunas de la DPA 2023. |
 | `db/assign_event_areas.sql` | **Nuevo.** Asigna cada sismo a una comuna. |
 | `db/homogenize_magnitudes.sql` | **Nuevo.** Calcula el Mw homogéneo de cada sismo (sección 4.5). |
+| `db/load_magnitude_estimates.sql` | **Nuevo.** Llena `magnitude_estimate` con las magnitudes de cada sismo (sección 5.3.1). |
 | `scripts/validate_ml_conversion.py` + `db/validate_ml_conversion.sql` | **Nuevos.** Descargan y cruzan los datos que validan la fórmula `Ml` → Mw ([MAGNITUDES.md](MAGNITUDES.md), sección 10). |
 | `db/load_census.sql` + `scripts/load_ine_manzanas_postgis.ps1` | **Nuevos.** Cargan las zonas urbanas y las manzanas del Censo 2024 (INE). El script lo preparó Ignacio y se integró con correcciones. |
 | `db/assign_urban_exposure.sql` | **Nuevo.** Calcula las zonas urbanas cercanas a cada sismo y la población a 25, 50 y 100 km. |
-| `db/queries.sql` | **Reescrito.** Contiene las 14 consultas básicas de la sección 8. |
+| `db/queries.sql` | **Reescrito.** Contiene las 15 consultas básicas de la sección 8. |
 | `docs/MAGNITUDES.md` | **Nuevo.** Explicación completa de las escalas de magnitud y de su conversión a Mw. |
 | `docs/INE_CENSO2024.md` | **Nuevo.** Guía completa del Censo 2024: qué datos se usan, cómo se cargan, cómo se mide la cercanía y resultados. |
+| `docs/modelo_logico.drawio` + `scripts/build_drawio_model.py` | **Nuevos.** Diagrama del modelo lógico en draw.io (datos cargados, tablas de análisis y flujo de carga) y el script que lo genera. Imágenes en `docs/img/`. |
+| `qgis/sismos_chile_v2.qgs` + `scripts/build_qgis_project.py` | **Nuevos.** Proyecto QGIS conectado a la base (sin contraseña) y el script que lo genera. |
 
 ---
 
@@ -65,20 +69,21 @@ Archivos del repositorio que se mencionan:
 
 1. **Se cargó la DPA 2023 oficial** (SUBDERE / IDE Chile): 16 regiones, 56 provincias y 345 comunas, reproyectadas de SIRGAS-Chile (EPSG:5360) a WGS 84 (EPSG:4326). Las superficies que calcula PostGIS coinciden con las oficiales al km² (sección 7.5).
 2. **Regiones, provincias y comunas quedaron en una sola tabla con jerarquía**: cada comuna apunta a su provincia y cada provincia a su región.
-3. **Cada uno de los 57.531 sismos quedó asignado a una comuna**:
-   - 23.156 (40 %) tienen el epicentro dentro de una comuna.
-   - 34.375 (60 %) están en el mar o fuera de Chile y se asignaron a la comuna más cercana, guardando la distancia en km.
+3. **Cada uno de los 59.534 sismos (datos al 11-11-2026) quedó con una comuna de referencia**:
+   - 24.442 (41 %) tienen el epicentro dentro de una comuna.
+   - 35.092 (59 %) están en el mar o fuera de Chile y se asignaron a la comuna más cercana, guardando la distancia en km. El 84 % de todos los sismos está a 100 km o menos de su comuna.
 4. **Se agregó una tabla técnica de trozos de comuna** (`ST_Subdivide`). Gracias a ella, la asignación de todos los sismos tarda unos 45 segundos y cada consulta, milisegundos.
-5. **Se reescribieron las consultas básicas** (por región, comuna, distancia, profundidad, densidad y tipo de magnitud). Las 10 corren en total en menos de 1 segundo.
-6. **Magnitudes comparables.** Se agregaron un catálogo de tipos de magnitud, una tabla con las fórmulas de conversión a Mw y la columna `mw_homogenized`. 45.617 sismos (79 %) quedaron con un Mw comparable. Esto responde la pregunta "¿todos los sismos vienen en Richter?": **no**. La sección 4.5 lo resume y [MAGNITUDES.md](MAGNITUDES.md) lo explica en detalle.
-7. **Zonas urbanas y población (Censo 2024).** La comuna cubre todo su territorio: la de Calama mide 15.545 km² y su ciudad 37 km². Se cargaron las 592 ciudades y pueblos y las 216.341 manzanas del Censo 2024, con población. Cada sismo quedó con su zona urbana más cercana, y cada sismo Mw ≥ 5 con todas las zonas urbanas a 200 km y la población a 25, 50 y 100 km. Ejemplo: de los 216 sismos Mw ≥ 5 con epicentro en la comuna de Calama, solo 1 cae dentro de la ciudad. Detalle en la sección 5.2.9 y en [INE_CENSO2024.md](INE_CENSO2024.md).
+5. **Se reescribieron las consultas básicas** (por región, comuna, distancia, profundidad, densidad, tipo de magnitud, zona urbana, población y tiempo). Las 15 corren en total en 0,75 segundos.
+6. **Magnitudes comparables.** Se agregaron un catálogo de tipos de magnitud, una tabla con las fórmulas de conversión a Mw y la columna `mw_homogenized`. 45.835 sismos (77 %) quedaron con un Mw comparable. Esto responde la pregunta "¿todos los sismos vienen en Richter?": **no**. La sección 4.5 lo resume y [MAGNITUDES.md](MAGNITUDES.md) lo explica en detalle.
+7. **Zonas urbanas y población (Censo 2024).** La comuna cubre todo su territorio: la de Calama mide 15.545 km² y su ciudad 37 km². Se cargaron las 592 ciudades y pueblos y las 216.341 manzanas del Censo 2024, con población. Cada sismo quedó con su zona urbana más cercana, y cada sismo Mw ≥ 5 con todas las zonas urbanas a 200 km y la población a 25, 50 y 100 km. Ejemplo: de los 217 sismos Mw ≥ 5 con epicentro en la comuna de Calama, solo 1 cae dentro de la ciudad. Detalle en la sección 5.2.9 y en [INE_CENSO2024.md](INE_CENSO2024.md).
 
-**Qué se diseñó para las etapas siguientes [DISEÑADO]:**
+8. **Modelo completo: 21 tablas (2026-11-12).** Las siete tablas de análisis ya existen en la base con llaves, restricciones e índices (sección 5.3): 14 tablas tienen datos y 7 son de análisis. Una de ellas, `magnitude_estimate`, ya está llena (104.225 filas); las otras seis son **[CREADA, SIN DATOS]**.
 
-1. **Varias magnitudes por evento** (`magnitude_estimate`), para cuando la descarga completa de USGS traiga más de una por sismo.
-2. **Réplicas.** Se agregan tablas para saber si un sismo es réplica de otro o un evento aislado, y cuántas réplicas tuvo cada terremoto.
-3. **USGS completo M≥4 e intensidad.** Se descargan los 30.959 sismos M≥4 desde 1900, con intensidad (MMI), alerta PAGER y contornos ShakeMap. Con las manzanas del censo ya cargadas, se podrá calcular la población expuesta a cada nivel de intensidad.
-4. **Emparejamiento CSN–USGS.** Sirve para detectar que dos registros son el mismo sismo y para calibrar las magnitudes.
+**Qué falta para la entrega 3 [PENDIENTE]:** los procesos que llenan esas tablas.
+
+1. **Réplicas.** Ejecutar Gardner-Knopoff sobre el catálogo y guardar el resultado en `declustering_run`, `seismic_sequence` y `event_sequence_role`. Ya se probó sobre el CSN (sección 4.6).
+2. **USGS completo M≥4 e intensidad.** Descargar los 30.959 sismos M≥4 desde 1900, con intensidad (MMI), alerta PAGER y contornos ShakeMap (`event_impact_summary`, `shakemap_contour`). Con las manzanas del censo ya cargadas, se podrá calcular la población expuesta a cada nivel de intensidad.
+3. **Emparejamiento CSN–USGS** (`event_match`). Sirve para detectar que dos registros son el mismo sismo y para calibrar las magnitudes.
 
 ---
 
@@ -87,14 +92,14 @@ Archivos del repositorio que se mencionan:
 | Requisito del enunciado | Dónde está en este documento | Estado |
 |---|---|---|
 | Representación de los datos en un motor espacial | Secciones 5 y 6 (PostgreSQL 18 + PostGIS 3.6.2) | Cumplido |
-| Modelo lógico de los datos | Sección 5 (diagrama y diccionario de cada tabla) | Cumplido |
-| Datos ingresados | Sección 7 (57.531 sismos, 417 áreas administrativas, 592 zonas urbanas y 216.341 manzanas) | Cumplido |
+| Modelo lógico de los datos | Sección 5 (21 tablas: diagrama, diccionario y `docs/modelo_logico.drawio`) | Cumplido |
+| Datos ingresados | Sección 7 (59.534 sismos, 417 áreas administrativas, 592 zonas urbanas y 216.341 manzanas) | Cumplido |
 | Consultas básicas sobre los datos | Sección 8 y `db/queries.sql` | Cumplido |
-| Informe: 1. Introducción con el problema y los aspectos de esta etapa | Secciones 1 y 3 | Material listo |
-| Informe: 2. Modelo lógico y sistema de almacenamiento | Secciones 5 y 6 | Material listo |
-| Informe: 3. Carga de datos y datos considerados | Sección 7 | Material listo |
-| Informe: 4. Etapas siguientes | Sección 11 | Material listo |
-| Presentación en laboratorio | Secciones 8 (demo SQL) y 7.8 (cómo reproducir) | Por preparar |
+| Informe: 1. Introducción con el problema y los aspectos de esta etapa | Secciones 1 y 3 | Entregado |
+| Informe: 2. Modelo lógico y sistema de almacenamiento | Secciones 5 y 6 | Entregado |
+| Informe: 3. Carga de datos y datos considerados | Sección 7 | Entregado |
+| Informe: 4. Etapas siguientes | Sección 11 | Entregado |
+| Presentación en laboratorio | Secciones 8 (consultas) y 7.8 (cómo reproducir) | Presentada |
 
 ---
 
@@ -119,14 +124,14 @@ Al cargar la DPA y probar con los datos reales aparecieron seis problemas:
 
 | # | Problema | Evidencia | Consecuencia |
 |---|---|---|---|
-| P1 | **La mayoría de los sismos de Chile son submarinos.** La placa de Nazca subduce bajo el continente frente a la costa, así que los epicentros caen en el mar. | 34.375 de 57.531 eventos (60 %) **no** quedan dentro de ninguna comuna. | Con `ST_Covers` puro, el 60 % de los sismos no tendría región. Por ejemplo, el terremoto del Maule 2010 (M 8,8) cae a 2,6 km de la costa de Cobquecura, en el mar. |
+| P1 | **La mayoría de los sismos de Chile son submarinos.** La placa de Nazca subduce bajo el continente frente a la costa, así que los epicentros caen en el mar. | 35.092 de 59.534 eventos (59 %) **no** quedan dentro de ninguna comuna. | Con `ST_Covers` puro, el 59 % de los sismos no tendría región. Por ejemplo, el terremoto del Maule 2010 (M 8,8) cae a 2,6 km de la costa de Cobquecura, en el mar. |
 | P2 | **Faltaba el nivel provincia**, y REGION y COMUNA eran dos tablas con la misma forma (código, nombre, polígono). | La DPA trae 3 niveles. | Hay columnas repetidas y no se pueden hacer consultas por provincia. |
 | P3 | **Calcular la región en cada consulta es lento** con polígonos de alta resolución. | La DPA tiene 6,8 millones de vértices solo en comunas, porque está a escala 1:50.000. | Una consulta "por región" tendría que probar cada punto contra polígonos gigantes. |
 | P4 | **Las magnitudes no son comparables entre sí.** | En la base, el CSN aparece con `MWconv` hasta el 23-06-2025 (catálogo histórico) y con `Ml`/`Mlv` desde el 24-06-2025 (páginas diarias); USGS usa sobre todo `mb`. | Contar "sismos M≥5" mezcla escalas distintas (sección 4.5). |
 | P5 | **No hay forma de representar réplicas.** | No hay ninguna relación entre eventos. | No se puede responder "¿es réplica?" ni "¿cuántas réplicas tuvo?". |
 | P6 | **El descargador de USGS descarta campos útiles.** | `download_usgs_earthquakes.py` no guarda `mmi`, `cdi`, `alert` ni los productos ShakeMap/PAGER. | No se puede analizar intensidad ni daño potencial. |
 
-P1, P2, P3 y P4 se resolvieron en esta entrega. En P4, la conversión de `Ml` quedó validada y la de `Mlv` sigue provisional ([MAGNITUDES.md](MAGNITUDES.md), sección 10). P5 y P6 quedan diseñados.
+P1, P2, P3 y P4 se resolvieron en esta entrega. En P4, la conversión de `Ml` quedó validada y la de `Mlv` sigue provisional ([MAGNITUDES.md](MAGNITUDES.md), sección 10). Para P5 y P6 las tablas ya están creadas (sección 5.3); los procesos que las llenan son de la entrega 3.
 
 ### 3.3 Correspondencia entre nombres del Hito 1 y nombres físicos
 
@@ -244,6 +249,8 @@ En PostGIS se traduce directamente a `ST_DWithin(principal.geom::geography, rép
 
 **Prueba de factibilidad.** Se hizo con datos USGS M≥4 consultados el 2026-11-06, contando sismos dentro de 300 km y 30 días después de cada terremoto. **Es solo una ilustración, no un declustering**: Maule 2010 (M 8,8) tuvo 1.245; Illapel 2015 (M 8,3), 695; Iquique 2014 (M 8,2), 387; Antofagasta 1995 (M 8,0), 143; y Valparaíso 1985 (M 8,0), 116.
 
+**Prueba del algoritmo completo (2026-11-12).** Se ejecutó Gardner-Knopoff en SQL (PL/pgSQL) sobre los 44.778 sismos CSN con Mw ≥ 4 desde 1960, llenando las tres tablas de réplicas dentro de una transacción que se deshizo al final (`ROLLBACK`): las tablas siguen vacías. Tardó 3 segundos. Encontró 4.322 secuencias; las mayores son Maule 2010 (941 réplicas, mayor réplica Mw 6,85), Illapel 2015 (820), Iquique 2014 (463) y Valparaíso 1985 (306, mayor réplica Mw 7,36). **Lección:** con la ventana de tiempo simétrica (la misma hacia atrás que hacia adelante) salieron 12.827 precursores, algunos casi 3 años antes del sismo principal, lo que no es realista. En la entrega 3 la ventana de precursores debe ser mucho más corta o solo hacia adelante, y cada variante se guarda como una ejecución distinta en `declustering_run`.
+
 **Tres advertencias que deben ir en el informe:**
 
 1. **Se aplica sobre una sola fuente.** Si se mezclan CSN y USGS, la copia CSN de un sismo aparecería como "réplica" de su copia USGS, porque ocurrió en el mismo lugar y a la misma hora. Recomendación: usar el catálogo USGS M≥4 (homogéneo y global).
@@ -268,7 +275,7 @@ Métodos alternativos para comparar más adelante: Reasenberg (1985), que encade
 
 ### 5.1 Diagrama
 
-Diagrama entidad-relación. GitHub y VS Code (extensión Mermaid) lo dibujan automáticamente. Las tablas **[DISEÑADO]** llevan el sufijo `_D`.
+Diagrama entidad-relación. GitHub y VS Code (extensión Mermaid) lo dibujan automáticamente. Las siete tablas de análisis (sección 5.3) están al final; la versión en draw.io (`docs/modelo_logico.drawio`) las separa en su propia página.
 
 ```mermaid
 erDiagram
@@ -290,17 +297,17 @@ erDiagram
     magnitude_conversion ||--o{ magnitude_conversion_rule : "formula"
     data_source ||--o{ magnitude_conversion_rule : "aplica a"
     magnitude_conversion ||--o{ earthquake_event : "mw_method"
-    magnitude_type ||--o{ magnitude_estimate_D : "clasifica"
-    earthquake_event ||--o{ magnitude_estimate_D : "tiene"
-    earthquake_event ||--o{ event_match_D : "se empareja (CSN)"
-    earthquake_event ||--o{ event_match_D : "se empareja (USGS)"
-    earthquake_event ||--o| event_impact_summary_D : "resume impacto"
-    earthquake_event ||--o{ shakemap_contour_D : "tiene contornos"
-    declustering_run_D ||--o{ seismic_sequence_D : "produce"
-    earthquake_event ||--o{ seismic_sequence_D : "es sismo principal de"
-    declustering_run_D ||--o{ event_sequence_role_D : "clasifica"
-    earthquake_event ||--o{ event_sequence_role_D : "recibe rol"
-    seismic_sequence_D ||--o{ event_sequence_role_D : "agrupa"
+    magnitude_type ||--o{ magnitude_estimate : "clasifica"
+    earthquake_event ||--o{ magnitude_estimate : "tiene"
+    earthquake_event ||--o{ event_match : "se empareja (CSN)"
+    earthquake_event ||--o{ event_match : "se empareja (USGS)"
+    earthquake_event ||--o| event_impact_summary : "resume impacto"
+    earthquake_event ||--o{ shakemap_contour : "tiene contornos"
+    declustering_run ||--o{ seismic_sequence : "produce"
+    earthquake_event ||--o{ seismic_sequence : "es sismo principal de"
+    declustering_run ||--o{ event_sequence_role : "clasifica"
+    earthquake_event ||--o{ event_sequence_role : "recibe rol"
+    seismic_sequence ||--o{ event_sequence_role : "agrupa"
 
     data_source {
         text source_code PK
@@ -427,49 +434,49 @@ erDiagram
         integer dwellings_adobe_50km
         integer urban_areas_50km
     }
-    magnitude_estimate_D {
+    magnitude_estimate {
         bigint earthquake_event_id PK,FK
         text magnitude_type_code PK,FK
         text agency PK
         numeric magnitude_value
         boolean is_preferred
     }
-    event_match_D {
+    event_match {
         bigint csn_event_id PK,FK
         bigint usgs_event_id PK,FK
         numeric time_difference_s
         numeric distance_km
         numeric match_score
     }
-    event_impact_summary_D {
+    event_impact_summary {
         bigint earthquake_event_id PK,FK
         numeric max_mmi
         numeric max_cdi
         text pager_alert
         boolean has_shakemap
     }
-    shakemap_contour_D {
+    shakemap_contour {
         bigint shakemap_contour_id PK
         bigint earthquake_event_id FK
         text metric "mmi pga"
         numeric contour_value
         geometry geom "MultiPolygon 4326"
     }
-    declustering_run_D {
+    declustering_run {
         bigint declustering_run_id PK
         text method
         jsonb parameters
         text source_code FK
         numeric minimum_magnitude
     }
-    seismic_sequence_D {
+    seismic_sequence {
         bigint seismic_sequence_id PK
         bigint declustering_run_id FK
         bigint mainshock_event_id FK
         integer aftershock_count
         geometry footprint "Polygon 4326"
     }
-    event_sequence_role_D {
+    event_sequence_role {
         bigint declustering_run_id PK,FK
         bigint earthquake_event_id PK,FK
         bigint seismic_sequence_id FK "NULL si independiente"
@@ -518,7 +525,7 @@ Cada ejecución de un cargador agrega una fila, aunque falle. Así se puede sabe
 
 #### 5.2.3 `earthquake_event` — sismos [IMPLEMENTADO, modificada en v2]
 
-Un registro por sismo **y por fuente**: si el CSN y USGS publican el mismo sismo, hay dos filas. La sección 5.3.3 propone cómo vincularlas.
+Un registro por sismo **y por fuente**: si el CSN y USGS publican el mismo sismo, hay dos filas. La tabla `event_match` (sección 5.3.3) las vinculará.
 
 | Columna | Tipo | Restricción | Descripción |
 |---|---|---|---|
@@ -632,13 +639,13 @@ Explicación completa, con todas las fórmulas y su origen, en [MAGNITUDES.md](M
 
 **Por qué es una tabla aparte y no otro nivel de `administrative_area`.** Una zona urbana no es una división administrativa: no tiene código CUT, no cubre todo el territorio y no forma una jerarquía completa (una comuna puede tener cero, una o varias zonas urbanas). Además tiene atributos propios, como la población y la categoría (decisión D12).
 
-### 5.3 Tablas diseñadas para las próximas etapas [DISEÑADO]
+### 5.3 Tablas de análisis [CREADA, SIN DATOS]
 
-Las definiciones son una propuesta para implementar. Pueden cambiar en detalle, pero la estructura está pensada para responder las preguntas planteadas.
+Las siete tablas están creadas en `db/schema.sql` desde el 2026-11-12, con llaves, restricciones e índices. Los fragmentos de abajo muestran su estructura; la definición exacta, con todas las restricciones, está en ese archivo. Solo `magnitude_estimate` tiene datos; las demás las llenan los procesos de la entrega 3 (sección 11).
 
 #### 5.3.1 Magnitudes: `magnitude_type`, `magnitude_estimate` y `mw_homogenized`
 
-`magnitude_type`, `magnitude_conversion`, `magnitude_conversion_rule` y `mw_homogenized` ya están **[IMPLEMENTADO]** (sección 5.2.8). Queda diseñada solo la tabla 1:N de magnitudes:
+`magnitude_type`, `magnitude_conversion`, `magnitude_conversion_rule` y `mw_homogenized` están **[IMPLEMENTADO]** (sección 5.2.8). La tabla 1:N de magnitudes también **[IMPLEMENTADO]**, desde el 2026-11-12:
 
 ```sql
 -- Todas las magnitudes publicadas para un evento (relación 1:N).
@@ -655,7 +662,7 @@ CREATE TABLE seismic.magnitude_estimate (
 
 **Para qué sirve:** un evento podría guardar a la vez la `mb` y la `Mww` de USGS sin perder ninguna.
 
-**Por qué todavía no se crea:** hoy cada evento trae como máximo dos magnitudes (la preferida y la original), y ambas ya están en `earthquake_event`. La tabla solo duplicaría esas columnas. Se implementará cuando la descarga completa de USGS traiga varias magnitudes por sismo.
+**Cómo se llena:** `db/load_magnitude_estimates.sql`, que `load_catalogs_postgis.ps1` ejecuta después de homogeneizar. Por cada sismo guarda la magnitud preferida y, si es distinta, la original. En el catálogo histórico del CSN la preferida es `MWconv` y la original es la que midió la agencia (`mb`, `ML`, `Md`...). Un índice único parcial garantiza **una sola** magnitud preferida por sismo. Al 11-11-2026 tiene 104.225 filas. Cuando la descarga completa de USGS traiga varias magnitudes por sismo, entrarán como filas nuevas sin cambiar `earthquake_event`.
 
 #### 5.3.2 Réplicas: `declustering_run`, `seismic_sequence` y `event_sequence_role`
 
@@ -817,6 +824,13 @@ Para los eventos sin ShakeMap se puede **estimar** la intensidad con anillos alr
 | Población de zonas urbanas = población de sus manzanas (verificado en carga) | `urban_area`, `census_block` | Las dos capas del INE son coherentes. |
 | UNIQUE (`earthquake_event_id`, `distance_rank`); CHECK hipocentral ≥ epicentral ≥ 0 | `event_urban_area` | Un solo "más cercano" por sismo y distancias coherentes. Además, la carga verifica que todo sismo tenga su zona más cercana. |
 | CHECK población a 25 ≤ 50 ≤ 100 km | `event_population_exposure` | Los anillos son acumulativos. |
+| Índice único parcial (`earthquake_event_id`) WHERE `is_preferred`; CHECK `origin` ∈ {`reported`, `converted`} | `magnitude_estimate` | A lo más una magnitud preferida por sismo. |
+| CHECK `csn_event_id` ≠ `usgs_event_id`; CHECK `match_score` entre 0 y 1; distancia y diferencia de tiempo ≥ 0 | `event_match` | Un sismo no se empareja consigo mismo y el puntaje es comparable. |
+| CHECK `method` ∈ {Gardner-Knopoff, Reasenberg, Zaliapin}; CHECK `period_start` ≤ `period_end` | `declustering_run` | Solo métodos documentados y períodos coherentes. |
+| UNIQUE (`declustering_run_id`, `mainshock_event_id`); conteos ≥ 0; `started_at` ≤ `ended_at` | `seismic_sequence` | Un sismo es principal de a lo más una secuencia por ejecución. |
+| PK (`declustering_run_id`, `earthquake_event_id`); CHECK (`role` = `independent`) = (`seismic_sequence_id` IS NULL) | `event_sequence_role` | Un solo papel por sismo y ejecución; los independientes no tienen secuencia y los demás sí. |
+| CHECK `max_mmi` y `max_cdi` entre 1 y 12; CHECK `pager_alert` ∈ {green, yellow, orange, red} | `event_impact_summary` | Intensidades y alertas válidas. |
+| UNIQUE (`earthquake_event_id`, `metric`, `contour_value`, `shakemap_version`); CHECK `metric` ∈ {mmi, pga, pgv} | `shakemap_contour` | Un contorno por valor y versión del ShakeMap. |
 | ON DELETE CASCADE | Relaciones hacia eventos y áreas | Al borrar un evento o un área no quedan filas huérfanas. |
 
 ### 5.5 Índices
@@ -836,6 +850,9 @@ Para los eventos sin ShakeMap se puede **estimar** la intensidad con anillos alr
 | `census_block_point_geog_gix` | GiST sobre `point::geography` | Manzanas a 100 km de un epicentro (`ST_DWithin` en metros). |
 | `urban_area_geom_gix`, `census_block_geom_gix` | GiST | Consultas sobre polígonos completos y QGIS. |
 | `urban_area_commune_idx`, `census_block_commune_idx`, `census_block_urban_area_idx`, `event_urban_area_urban_idx` | B-tree | Unir con comunas, zonas urbanas y sismos. |
+| `magnitude_estimate_preferred_uidx` | B-tree único parcial | Garantiza una magnitud preferida por sismo. |
+| `shakemap_contour_geom_gix`, `seismic_sequence_footprint_gix` | GiST | Cruzar contornos de intensidad con manzanas y zonas de réplicas con el territorio. |
+| `event_match_usgs_idx`, `event_sequence_role_event_idx`, `event_sequence_role_sequence_idx`, `seismic_sequence_mainshock_idx` | B-tree | Buscar el par, el papel o la secuencia de un sismo. |
 
 ---
 
@@ -853,7 +870,7 @@ Para los eventos sin ShakeMap se puede **estimar** la intensidad con anillos alr
 
 **Instancia aislada.** La base corre en un clúster propio en `127.0.0.1:5433`, con los datos en `%LOCALAPPDATA%\SismosChilePostgres`. Así no choca con otro PostgreSQL que use el puerto estándar 5432, y queda fuera de OneDrive para que una sincronización no corrompa archivos de la base. Se inicia con `scripts/start_local_postgis.ps1`, que además aplica `db/schema.sql`.
 
-**Tamaño actual.** 906 MB en total. El detalle por tabla está en la sección 7.5 y, para el censo, en [INE_CENSO2024.md](INE_CENSO2024.md), sección 5.
+**Tamaño actual.** 937 MB en total (11-11-2026). El detalle por tabla está en la sección 7.5 y, para el censo, en [INE_CENSO2024.md](INE_CENSO2024.md), sección 5.
 
 **Conexión desde QGIS:** host `127.0.0.1`, puerto `5433`, base `sismos_chile`, usuario `sismos_app`, contraseña en `.env`. Capas recomendadas:
 
@@ -870,19 +887,19 @@ Para los eventos sin ShakeMap se puede **estimar** la intensidad con anillos alr
 | Dato | Fuente | Formato | Período / versión | Registros en la base | SRID original |
 |---|---|---|---|---|---|
 | Catálogo histórico de sismos | CSN, Universidad de Chile | CSV | 1513-01-01 a 2025-06-23 | 44.691 | 4326 |
-| Sismos diarios | CSN (páginas oficiales por día) | HTML → CSV | 2025-06-24 a 2026-09-22 | 12.798 | 4326 |
-| Sismos USGS (muestra) | USGS ComCat (API FDSN) | GeoJSON → CSV | 2026-08-01 a 2026-08-30, M≥2,5 | 42 | 4326 |
+| Sismos diarios | CSN (páginas oficiales por día) | HTML → CSV | 2025-06-24 a 2026-11-11 | 14.654 | 4326 |
+| Sismos USGS (muestra) | USGS ComCat (API FDSN) | GeoJSON → CSV | 2026-08-01 a 2026-11-11, M≥2,5 | 189 | 4326 |
 | **Regiones** | DPA 2023, SUBDERE / IDE Chile | Shapefile | v1, publicada 2023-08-03 | **16** | **5360** |
 | **Provincias** | DPA 2023 | Shapefile | v1 | **56** | **5360** |
 | **Comunas** | DPA 2023 | Shapefile | v1 | **345** | **5360** |
 | **Zonas urbanas** (ciudades y pueblos) | Censo 2024, INE (`Limite_Urbano_CPV24`) | GeoParquet | publicada 2025-12-16 | **592** | **4674** |
 | **Manzanas** con población | Censo 2024, INE (`Manzanas_CPV24`) | GeoParquet | publicada 2025-12-16 | **216.341** | **4674** |
 
-Total de sismos: **57.531** (CSN 57.489 + USGS 42).
+Total de sismos: **59.534** (CSN 59.345 + USGS 189).
 
 **Cita obligatoria de la DPA**, según su metadato: *"Autorizada su circulación por Resolución Nº 87 del 2023 de la Dirección Nacional de Fronteras y Límites del Estado"*. Hay que incluirla en el informe y en cualquier mapa que muestre los límites. **El CSN y el INE también exigen cita.**
 
-**Sobre la actualidad.** Los sismos llegan al 22-09-2026, porque los catálogos no se actualizan desde entonces. Antes de la presentación conviene volver a ejecutar los descargadores (sección 11).
+**Sobre la actualidad.** Los sismos llegan al 11-11-2026: los catálogos se actualizaron para la entrega. Para traer sismos más nuevos basta volver a ejecutar los descargadores y `load_catalogs_postgis.ps1` (sección 7.8).
 
 ### 7.2 Flujo general
 
@@ -901,6 +918,8 @@ flowchart LR
     PY --> CSV[CSV normalizados<br/>data/processed]
     CSV --> LC[load_catalogs.sql<br/>UPSERT]
     LC --> HM[homogenize_magnitudes.sql<br/>Mw homogéneo]
+    HM --> LME[load_magnitude_estimates.sql]
+    LME --> ME[(magnitude_estimate)]
     DPA --> SHP[shp2pgsql<br/>esquema dpa_staging]
     SHP --> LD[load_dpa.sql<br/>5360 → 4326, validación,<br/>jerarquía, ST_Subdivide]
     HM --> EV[(earthquake_event)]
@@ -952,19 +971,21 @@ Regla, implementada en `db/assign_event_areas.sql`:
 
 Se recalcula completa en cada ejecución, en una transacción, y tarda unos 45 s. **También se ejecuta automáticamente al final de `load_catalogs_postgis.ps1`** si la DPA está cargada. Así los sismos nuevos quedan con comuna sin un paso manual.
 
-**Resultado (2026-11-06):**
+**Resultado (datos al 2026-11-11):**
 
 | Distancia a la comuna | Sismos | % |
 |---|---:|---:|
-| 0 km (dentro: `covers`) | 23.156 | 40,2 % |
-| 0–50 km (`nearest`) | 18.840 | 32,7 % |
-| 50–100 km | 6.195 | 10,8 % |
-| 100–200 km | 4.872 | 8,5 % |
-| 200–500 km | 3.327 | 5,8 % |
-| > 500 km | 1.141 | 2,0 % |
-| **Total** | **57.531** | 100 % |
+| 0 km (dentro: `covers`) | 24.442 | 41,1 % |
+| 0–50 km (`nearest`) | 19.417 | 32,6 % |
+| 50–100 km | 6.274 | 10,5 % |
+| 100–200 km | 4.925 | 8,3 % |
+| 200–500 km | 3.333 | 5,6 % |
+| > 500 km | 1.143 | 1,9 % |
+| **Total** | **59.534** | 100 % |
 
-Con `distance_km <= 100` quedan 48.191 sismos (84 %) como "sismos de Chile en tierra o en su costa".
+Con `distance_km <= 100` quedan 50.133 sismos (84 %) como "sismos de Chile en tierra o en su costa".
+
+**Ojo con la palabra "asignado".** Todo sismo tiene una comuna **de referencia**, aunque esté muy lejos: 9.401 sismos están a más de 100 km de su comuna y 5 a más de 1.000 km. El más lejano está en medio del Pacífico, a 1.504 km de Isla de Pascua, que es su comuna asignada. Por eso las consultas filtran por `distance_km` (decisión D4).
 
 **Casos de control revisados:**
 
@@ -987,10 +1008,10 @@ Con `distance_km <= 100` quedan 48.191 sismos (84 %) como "sismos de Chile en ti
 | Jerarquía | Ninguna provincia ni comuna quedó sin padre (control automático). Por ejemplo: Isla de Pascua → provincia Isla de Pascua → región Valparaíso. |
 | Geometrías | Ninguna geometría vacía o inválida (control automático). |
 | Trozos | 86.819 trozos, cada uno con 255 vértices o menos. |
-| Asignación | 57.531 de 57.531 sismos con exactamente una comuna. |
-| **Idempotencia** | Se ejecutó la carga completa de la DPA dos veces. En `ingestion_run`, la carga 9 registra 417 áreas insertadas y la carga 10 registra 0 insertadas y 417 actualizadas. Siguen siendo 16 + 56 + 345 áreas, y la asignación de eventos dio exactamente los mismos conteos (23.156 `covers` y 34.375 `nearest`). |
-| Tiempos | Carga DPA: entre 75 s y 2 min. Asignación: ~45 s. Mw homogéneo: 1,8 s. Carga del censo: 27 s. Cercanía y población: 10–12 min completo, segundos en modo incremental. Las 14 consultas de `queries.sql`: 0,7 s en total. |
-| Tamaño en disco | Base completa: 541 MB antes del censo y 906 MB con él (detalle del censo en [INE_CENSO2024.md](INE_CENSO2024.md), sección 5). `administrative_area`: 308 MB (polígonos 1:50.000 con ~19 millones de vértices sumando los tres niveles). `administrative_area_part`: 122 MB. `earthquake_event`: 87 MB. `event_administrative_area`: 9 MB. Una recarga reescribe los polígonos, así que `load_dpa.sql` termina con `VACUUM` para que la base no crezca en cada recarga. |
+| Asignación | 59.534 de 59.534 sismos con exactamente una comuna de referencia: 41 % dentro de ella y 84 % a 100 km o menos. |
+| **Idempotencia** | Se ejecutó la carga completa de la DPA dos veces. En `ingestion_run`, la carga 9 registra 417 áreas insertadas y la carga 10 registra 0 insertadas y 417 actualizadas. Siguen siendo 16 + 56 + 345 áreas, y la asignación de eventos dio exactamente los mismos conteos (23.156 `covers` y 34.375 `nearest`, con los 57.531 sismos de ese día). |
+| Tiempos | Carga DPA: entre 75 s y 2 min. Asignación: ~45 s. Mw homogéneo: 1,8 s. Carga del censo: 27 s. Cercanía y población: 10–12 min completo, segundos en modo incremental. Las 15 consultas de `queries.sql`: 0,75 s en total. |
+| Tamaño en disco | Base completa: 541 MB antes del censo, 906 MB con él y 937 MB con las tablas de análisis y los datos al 11-11 (detalle del censo en [INE_CENSO2024.md](INE_CENSO2024.md), sección 5). `administrative_area`: 308 MB (polígonos 1:50.000 con ~19 millones de vértices sumando los tres niveles). `administrative_area_part`: 122 MB. `earthquake_event`: 87 MB. `event_administrative_area`: 9 MB. Una recarga reescribe los polígonos, así que `load_dpa.sql` termina con `VACUUM` para que la base no crezca en cada recarga. |
 
 ### 7.6 Carga del Censo 2024
 
@@ -1018,7 +1039,7 @@ Implementado en `db/assign_urban_exposure.sql`. Reglas en la sección 5.2.9.
 1. Se busca **en el plano** el punto del trozo más cercano al epicentro (`ST_ClosestPoint`) y solo se mide sobre el elipsoide la distancia entre esos dos puntos. Es barato y **nunca subestima**; en las pruebas se alejó en promedio 4 m y como máximo 0,4 km de la exacta.
 2. Se mide **exacto** (`ST_Distance` sobre `geography`) solo contra los trozos cuya aproximada está a menos de 2 km de la mejor. Así el trozo realmente más cercano siempre queda entre los medidos.
 
-Se verificó contra el cálculo exacto completo: **0 diferencias** en los 376.948 vínculos y en la población de los 6.388 sismos. El paso más caro que queda es contar la población: decenas de millones de pares manzana–sismo, ~3,5 min. Medirlo sobre la esfera en vez del elipsoide era más rápido, pero cambiaba los conteos, así que se descartó.
+Se verificó contra el cálculo exacto completo: **0 diferencias** en los 376.948 vínculos y en la población de los 6.388 sismos que había el 07-11 (al 11-11 son 379.691 vínculos y 6.403 sismos). El paso más caro que queda es contar la población: decenas de millones de pares manzana–sismo, ~3,5 min. Medirlo sobre la esfera en vez del elipsoide era más rápido, pero cambiaba los conteos, así que se descartó.
 
 **Dos modos:**
 
@@ -1057,7 +1078,7 @@ El zip de la DPA no está en Git porque pesa 311 MB y pertenece a SUBDERE. Cada 
 
 ## 8. Consultas básicas
 
-Todas están en `db/queries.sql`, numeradas igual que aquí. Los resultados corresponden a la base del 2026-11-06.
+Todas están en `db/queries.sql`, numeradas igual que aquí. Los resultados corresponden a la base con datos al 2026-11-11.
 
 | # | Pregunta que responde | Funciones espaciales clave |
 |---|---|---|
@@ -1075,20 +1096,22 @@ Todas están en `db/queries.sql`, numeradas igual que aquí. Los resultados corr
 | 12 | Los 10 sismos Mw ≥ 6 desde 1960 con más población censada a 50 km | `event_population_exposure` |
 | 13 | Ciudades (conurbaciones como una sola) con más sismos Mw ≥ 5 a ≤ 100 km del hipocentro | N:M sismo–zona urbana + distancia hipocentral |
 | 14 | Comuna versus ciudad: de los sismos Mw ≥ 5 con epicentro en la comuna, cuántos caen dentro de una zona urbana | `covers` + epicentral = 0 |
+| 15 | Actividad de una comuna en una ventana de tiempo, por mes (Calama, últimos 3 meses de datos) | `covers` + rango de `occurred_at` + `GROUP BY ROLLUP` |
 
 **Resultados destacados:**
 
-- **Consulta 2.** Antofagasta concentra 10.349 sismos Mw≥4 (4.818 en tierra y 5.531 en el mar cercano), seguida de Coquimbo (6.811) y Valparaíso (4.128). El Mw máximo por región muestra los grandes terremotos: 9,55 en Biobío (Valdivia 1960, epicentro en Tirúa) y 8,79 en Ñuble (Maule 2010).
-- **Consulta 3.** Calama es la comuna con más sismos Mw≥5 con epicentro dentro (216), seguida de Antofagasta (124) y Pica (95). Los de Calama tienen una profundidad media de 112 km (sismos intermedios dentro de la placa de Nazca, bajo el continente).
-- **Consulta 5.** Hay 828 sismos dentro de la región de Valparaíso, el mismo número que da la tabla materializada (`covers`). **Esto valida que ambos caminos son consistentes.**
-- **Consulta 6.** Tarapacá tiene la mayor densidad, con 108 sismos por 1.000 km², y Magallanes la menor, con 0,4.
-- **Consulta 7.** En Antofagasta y Tarapacá predominan los sismos intermedios (70–300 km): 13.580 de 15.589 en Antofagasta. En Coquimbo y Valparaíso predominan los superficiales (< 70 km). Esto refleja la geometría de la placa que subduce.
-- **Consulta 1.** Hoy devuelve 0 filas porque los datos llegan al 22-09-2026. Volverá a tener resultados cuando se actualicen los catálogos.
+- **Consulta 2.** Antofagasta concentra 10.429 sismos Mw≥4 (4.871 en tierra y 5.558 en el mar cercano), seguida de Coquimbo (6.838) y Valparaíso (4.144). El Mw máximo por región muestra los grandes terremotos: 9,55 en Biobío (Valdivia 1960, epicentro en Tirúa) y 8,79 en Ñuble (Maule 2010).
+- **Consulta 3.** Calama es la comuna con más sismos Mw≥5 con epicentro dentro (217), seguida de Antofagasta (124) y Pica (98). Los de Calama tienen una profundidad media de 112 km (sismos intermedios dentro de la placa de Nazca, bajo el continente).
+- **Consulta 5.** Hay 847 sismos dentro de la región de Valparaíso, el mismo número que da la tabla materializada (`covers`). **Esto valida que ambos caminos son consistentes.**
+- **Consulta 6.** Tarapacá tiene la mayor densidad, con 117 sismos por 1.000 km², y Magallanes la menor, con 0,4.
+- **Consulta 7.** En Antofagasta y Tarapacá predominan los sismos intermedios (70–300 km): 14.470 de 16.562 en Antofagasta. En Coquimbo y Valparaíso predominan los superficiales (< 70 km). Esto refleja la geometría de la placa que subduce.
+- **Consulta 1.** Usa la fecha en que se ejecuta. Corrida el 22-11-2026 devuelve 804 sismos (del 23-10 al 11-11, porque los datos llegan al 11-11).
 - **Consulta 11.** Valdivia 1960 (Mw 9,55) tiene como zona urbana más cercana a Contulmo, a 19,7 km del epicentro y 31,8 km del hipocentro. Maule 2010 (Mw 8,79): Cobquecura, a 9,0 km.
-- **Consulta 12.** Encabeza Los Andes 1983 (Mw 6,0, a 99 km de profundidad): 2,0 millones de personas a 50 km del epicentro y 7,4 millones a 100 km. Le siguen varios sismos de la secuencia de Valparaíso de 1985. El principal (Mw 7,36) tenía 1,2 millones de personas a 50 km y 4,0 millones a 100 km. Es población que **hoy** vive cerca (censo 2024), no la de 1985, y no es daño. Empieza en 1960 porque antes los epicentros tienen errores de decenas de km.
-- **Consulta 13.** Las ciudades con más sismos Mw ≥ 5 a 100 km o menos del hipocentro están en el litoral central: Algarrobo–El Quisco–El Tabo (399), San Antonio (389) y Gran Valparaíso (340). Luego viene La Serena–Coquimbo (306).
-- **Consulta 14.** **Responde la pregunta "¿la comuna considera zonas urbanas?":** de los 216 sismos Mw ≥ 5 con epicentro en la comuna de Calama, solo 1 cae dentro de la ciudad, que ocupa 37 de los 15.545 km² de la comuna. En Antofagasta son 124 y 0.
-- **Consulta 10.** La magnitud cruda da 983 sismos M≥4 el año anterior y 703 el posterior. Con Mw ≥ 4,5 da 252 y 229, y con Mw ≥ 5 da 67 y 66. Esto muestra por qué hay que comparar con `mw_homogenized` y desde 4,5 ([MAGNITUDES.md](MAGNITUDES.md), sección 8). Es un buen ejemplo para la presentación.
+- **Consulta 12.** Encabeza Los Andes 1983 (Mw 6,0, a 99 km de profundidad, epicentro en la comuna de Los Andes, Región de Valparaíso): 2,0 millones de personas a 50 km del epicentro y 7,4 millones a 100 km. Le siguen varios sismos de la secuencia de Valparaíso de 1985. **El terremoto principal** (03-03-1985, 22:47 UTC, Mw 7,95, epicentro en el mar frente a Casablanca) no entra en los diez primeros: tiene 1,04 millones de personas a 50 km y 1,86 millones a 100 km. El Mw 7,36 de la lista es **su mayor réplica**, 1 h 45 min después, con 1,2 millones a 50 km y 4,0 millones a 100 km. Es población que **hoy** vive cerca (censo 2024), no la de 1985, y no es daño. Empieza en 1960 porque antes los epicentros tienen errores de decenas de km.
+- **Consulta 13.** Las ciudades con más sismos Mw ≥ 5 a 100 km o menos del hipocentro están en el litoral central: Algarrobo–El Quisco–El Tabo (401), San Antonio–Cartagena (391) y Gran Valparaíso (340). Luego viene La Serena–Coquimbo (308).
+- **Consulta 14.** **Responde la pregunta "¿la comuna considera zonas urbanas?":** de los 217 sismos Mw ≥ 5 con epicentro en la comuna de Calama, solo 1 cae dentro de la ciudad, que ocupa 37 de los 15.545 km² de la comuna. En Antofagasta son 124 y 0.
+- **Consulta 10.** La magnitud cruda da 983 sismos M≥4 el año anterior y 703 el posterior. Con Mw ≥ 4,5 da 252 y 229, y con Mw ≥ 5 da 67 y 66. Esto muestra por qué hay que comparar con `mw_homogenized` y desde 4,5 ([MAGNITUDES.md](MAGNITUDES.md), sección 8). Entre Mw 4 y 4,5 no coinciden (983 y 698) porque el catálogo histórico trae además sismos regionales de boletines internacionales.
+- **Consulta 15.** En los últimos 3 meses de datos (11-08 al 11-11-2026) hubo 586 sismos con epicentro en la comuna de Calama: unos 6 por día, 42 con Mw ≥ 4, a 119 km de profundidad media. Por mes: 113 (agosto, desde el 11), 189, 196 y 88 (noviembre, hasta el 11). El mayor (Mw 5,13, 11-11) aparece dos veces, una por el CSN (Mw 4,9) y otra por USGS: es el caso que resolverá `event_match`. Tarda 23 ms.
 
 ---
 
@@ -1102,14 +1125,15 @@ Todas están en `db/queries.sql`, numeradas igual que aquí. Los resultados corr
 | D4 | **Asignar al más cercano con `distance_km`**, sin descartar sismos | Dejar sin región los sismos marinos; o asignar solo hasta un umbral fijo | Ningún umbral sirve para todas las preguntas. Guardar la distancia deja que cada consulta decida. Se recomienda ≤ 100 km. |
 | D5 | **`ST_Subdivide` en una tabla aparte** | Simplificar los polígonos (`ST_Simplify`) | Simplificar cambia los límites y puede mover sismos de comuna. Subdividir conserva la geometría exacta. |
 | D6 | **Importar en 5360 y transformar en SQL** | Reproyectar con `shp2pgsql -s 5360:4326` o en QGIS | Deja la transformación visible y auditable en `load_dpa.sql`. |
-| D7 | **Describir las escalas y las fórmulas como datos** (`magnitude_type`, `magnitude_conversion`, `magnitude_conversion_rule`) [IMPLEMENTADO]; magnitudes 1:N (`magnitude_estimate`) [DISEÑADO] | Agregar columnas `mb`, `ml`, `mw`... a `earthquake_event`; escribir las fórmulas dentro de un `CASE` en SQL | Las escalas nuevas se agregan como filas. Una calibración se cambia con un `UPDATE`, sin tocar código. Cada Mw guarda qué fórmula lo produjo. |
+| D7 | **Describir las escalas y las fórmulas como datos** (`magnitude_type`, `magnitude_conversion`, `magnitude_conversion_rule`) [IMPLEMENTADO]; magnitudes 1:N (`magnitude_estimate`) [IMPLEMENTADO] | Agregar columnas `mb`, `ml`, `mw`... a `earthquake_event`; escribir las fórmulas dentro de un `CASE` en SQL | Las escalas nuevas se agregan como filas. Una calibración se cambia con un `UPDATE`, sin tocar código. Cada Mw guarda qué fórmula lo produjo. |
 | D11 | **Convertir a Mw con las fórmulas reconstruidas del CSN** y **no extrapolar** fuera de su rango [IMPLEMENTADO] | Relaciones globales de Scordilis (2006); aplicar las fórmulas a cualquier magnitud | Las fórmulas del CSN dejan todo en la misma escala que el 77 % de la base (`MWconv`) y están calibradas con sismos chilenos. Con Scordilis, un `mb` 4,0 sería Mw 4,43 en vez de 3,87. No extrapolar evita inventar precisión en sismos chicos. Detalle en [MAGNITUDES.md](MAGNITUDES.md). |
-| D8 | **Réplicas como resultado de una ejecución de método** [DISEÑADO] | Columna booleana `es_replica` | La clasificación depende del método y de sus parámetros (sección 5.3.2). |
-| D9 | **Declustering sobre USGS M≥4** [DISEÑADO] | Sobre CSN + USGS combinados | Evita que los duplicados entre fuentes se cuenten como réplicas. USGS es homogéneo en el tiempo para M≥4. |
+| D8 | **Réplicas como resultado de una ejecución de método** [CREADA, SIN DATOS] | Columna booleana `es_replica` | La clasificación depende del método y de sus parámetros (sección 5.3.2). |
+| D9 | **Declustering sobre una sola fuente** (USGS M≥4 cuando esté completo; la prueba del 12-11 se hizo sobre el CSN) [PENDIENTE] | Sobre CSN + USGS combinados | Evita que los duplicados entre fuentes se cuenten como réplicas. USGS es homogéneo en el tiempo para M≥4. |
 | D10 | **Hablar de "intensidad" y "población expuesta"**, no de "daño" | Calcular "daño" | El censo da un indicador de vulnerabilidad (viviendas de adobe), pero sin intensidad medida (ShakeMap) no se puede decir qué se dañó. Afirmar daño sería una conclusión no sustentada. |
 | D12 | **Zonas urbanas en una tabla aparte (`urban_area`)**, ligada a su comuna, y manzanas en `census_block` [IMPLEMENTADO] | Agregar `level = 'urban_area'` a `administrative_area`; cargar solo la población por comuna | Una zona urbana no es división administrativa: no tiene CUT, no cubre el territorio y una comuna puede tener varias o ninguna. La población por comuna no sirve para lo que se pregunta: la comuna de Calama tiene 15.545 km² y su ciudad 37. Las manzanas permiten contar población a cualquier distancia. |
 | D13 | **Relación N:M sismo–zona urbana materializada**, con regla fija (la más cercana siempre y, si Mw ≥ 5, todas a 200 km), y población a 25/50/100 km precalculada [IMPLEMENTADO] | Calcular en cada consulta; guardar solo la más cercana | Cada consulta tarda milisegundos en vez de minutos. Guardar todas las zonas a 200 km deja que cada consulta elija su radio, igual que `distance_km` en D4. El umbral Mw ≥ 5 limita la tabla a 376.948 filas. |
 | D14 | **Distancia en dos etapas** (punto más cercano en el plano y luego distancia exacta con margen de 2 km) y **modo incremental** [IMPLEMENTADO] | Medir todo sobre `geography` (26 min); medir sobre la esfera; quedarse solo con la aproximada | Da exactamente el mismo resultado que medir todo exacto, verificado fila por fila. La esfera cambiaba los conteos de población. Con el modo incremental, la carga diaria de sismos no paga 10 minutos extra. |
+| D15 | **Crear las 7 tablas de análisis en esta entrega**, aunque se llenen en la entrega 3 [IMPLEMENTADO] | Dejarlas solo diseñadas en este documento | El modelo lógico queda completo y el motor valida sus llaves y restricciones al crear el esquema. Los procesos de la entrega 3 solo insertan filas, sin cambiar el esquema. |
 
 ---
 
@@ -1117,15 +1141,15 @@ Todas están en `db/queries.sql`, numeradas igual que aquí. Los resultados corr
 
 1. **`nearest` no distingue entre mar y país vecino.** Un sismo a 30 km de la frontera con Argentina y uno a 30 km de la costa reciben el mismo trato. Para separarlos haría falta una capa de países, como Natural Earth (sección 11).
 2. **La asignación depende de la precisión del epicentro.** Los sismos históricos (antes de ~1960) pueden tener errores de decenas de km, así que su comuna es aproximada.
-3. **La conversión `Mlv` → Mw es provisional** (302 eventos desde 2026). Puede dar ~0,1 más alto. La de `Ml` (287 eventos) está validada. Hay 11.914 eventos sin Mw, casi todos sismos chicos diarios.
-4. **El catálogo histórico y las páginas diarias del CSN no tienen la misma cobertura.** El histórico agrega sismos regionales de boletines internacionales; en 2024–2025 hay 983 eventos Mw ≥ 4 contra 638. Para comparar a través del 24-06-2025 conviene Mw ≥ 4,5 o `distance_km <= 100` ([MAGNITUDES.md](MAGNITUDES.md), secciones 8 y 10).
-4. **Un mismo sismo puede estar dos veces**, una por fuente, hasta implementar `event_match`.
-5. **Los datos de sismos llegan al 22-09-2026.**
-6. **La DPA no incluye el Territorio Antártico.** Los sismos del sur lejano se asignan a Cabo de Hornos con distancias grandes.
-7. **Las regiones y comunas que desaparezcan en una DPA futura no se borran solas.** El UPSERT solo inserta y actualiza. Las zonas urbanas del censo sí: `load_census.sql` borra las que ya no vienen en el archivo.
-8. **La población en manzanas es el 87,6 % de lo censado.** Falta principalmente la población rural dispersa, que el INE publica en la capa `Entidades`.
-9. **La población es la del Censo 2024**, también para sismos antiguos: describe a quienes hoy viven cerca de donde ocurrió el sismo, no a quienes vivían ese año.
-10. **El modo incremental de la cercanía no detecta reubicaciones** de sismos ya calculados. Se corrige con el modo completo.
+3. **La conversión `Mlv` → Mw es provisional** (358 eventos). Puede dar ~0,1 más alto. La de `Ml` (287 eventos) está validada. Hay 13.699 eventos sin Mw, casi todos sismos chicos diarios fuera del rango de las fórmulas.
+4. **El catálogo histórico y las páginas diarias del CSN no tienen la misma cobertura.** El histórico agrega sismos regionales de boletines internacionales; un año antes del 24-06-2025 hay 983 eventos Mw ≥ 4 y un año después, 698. Para comparar a través del 24-06-2025 conviene Mw ≥ 4,5 o `distance_km <= 100` ([MAGNITUDES.md](MAGNITUDES.md), secciones 8 y 10).
+5. **Un mismo sismo puede estar dos veces**, una por fuente, hasta llenar `event_match`. Ejemplo: el mayor sismo de Calama en la consulta 15.
+6. **Los datos de sismos llegan al 11-11-2026.**
+7. **La DPA no incluye el Territorio Antártico.** Los sismos del sur lejano se asignan a Cabo de Hornos con distancias grandes. En general, la comuna de referencia puede estar muy lejos: 9.401 sismos a más de 100 km y 5 a más de 1.000 km (sección 7.4).
+8. **Las regiones y comunas que desaparezcan en una DPA futura no se borran solas.** El UPSERT solo inserta y actualiza. Las zonas urbanas del censo sí: `load_census.sql` borra las que ya no vienen en el archivo.
+9. **La población en manzanas es el 87,6 % de lo censado.** Falta principalmente la población rural dispersa, que el INE publica en la capa `Entidades`.
+10. **La población es la del Censo 2024**, también para sismos antiguos: describe a quienes hoy viven cerca de donde ocurrió el sismo, no a quienes vivían ese año.
+11. **El modo incremental de la cercanía no detecta reubicaciones** de sismos ya calculados. Se corrige con el modo completo.
 
 ---
 
@@ -1135,12 +1159,10 @@ Calendario según el programa del curso: Control 3 el 30-11 y entrega final (Pro
 
 | Período | Trabajo | Resultado esperado |
 |---|---|---|
-| **7–9 nov** | Preparar el informe y la presentación de la Entrega 2 con este documento. Actualizar los catálogos CSN y USGS. Armar un proyecto QGIS con regiones, comunas y sismos coloreados por profundidad. | Entrega 2 (09-11). |
-| **10–16 nov** | **Descargar USGS completo M≥4** (30.959 eventos desde 1900; el descargador ya divide en tramos de menos de 20.000). Extender el descargador y el cargador con `mmi`, `cdi`, `alert` y productos. Crear `event_impact_summary`. | Catálogo homogéneo M≥4 para el análisis. |
-| **10–16 nov** | Crear `magnitude_estimate` junto con la descarga completa de USGS. Con los pares `Mlv`–`mww` nuevos, calibrar una fórmula propia para `Mlv` (hoy provisional). La de `Ml` ya se validó el 06-11. | `Mlv` validada o recalibrada. |
-| **17–23 nov** | Crear `event_match` (CSN ↔ USGS). Comparar `mw_homogenized` del CSN con el Mw de USGS en los pares emparejados. | Segunda validación y conteo sin duplicados. |
-| **24–30 nov** | Declustering Gardner-Knopoff en SQL/PostGIS: `declustering_run`, `seismic_sequence` y `event_sequence_role`. Analizar Omori y Båth para los grandes terremotos. | Respuesta a "¿es réplica?" y "¿cuántas réplicas?". |
-| **1–7 dic** | Descargar contornos ShakeMap (1.165 eventos) a `shakemap_contour`. Consulta de población expuesta a MMI ≥ VI con las manzanas del censo (ya cargadas el 07-11). Proyecto QGIS final. Informe final. | Entrega final (07-12). |
+| **7–12 nov** | **Hecho.** Informe y presentación de la Entrega 2. Catálogos CSN y USGS actualizados al 11-11. Proyecto QGIS. Las 7 tablas de análisis creadas y `magnitude_estimate` cargada. Consulta 15 (tiempo). Prueba de Gardner-Knopoff sobre el CSN (sección 4.6). | Entrega 2. |
+| **12–23 nov** | **Descargar USGS completo M≥4** (30.959 eventos desde 1900; el descargador ya divide en tramos de menos de 20.000). Extender el descargador y el cargador con `mmi`, `cdi`, `alert` y productos, y llenar `event_impact_summary`. Con los pares `Mlv`–`mww`, calibrar una fórmula propia para `Mlv` (hoy provisional). | Catálogo homogéneo M≥4 y `Mlv` validada o recalibrada. |
+| **17–30 nov** | Llenar `event_match` (CSN ↔ USGS, menos de 60 s y 100 km) y comparar el Mw de ambas fuentes en los pares. Declustering Gardner-Knopoff con la ventana de precursores corregida: `declustering_run`, `seismic_sequence` y `event_sequence_role`. Analizar Omori y Båth para los grandes terremotos. | Conteo sin duplicados; respuesta a "¿es réplica?" y "¿cuántas réplicas?". |
+| **1–7 dic** | Descargar contornos ShakeMap (1.165 eventos) a `shakemap_contour`. Consulta de población expuesta a MMI ≥ VI con las manzanas del censo. Proyecto QGIS final. Informe final. | Entrega final (07-12). |
 | Opcional | Capa de países (Natural Earth) para distinguir mar y extranjero en `nearest`. Comparar Gardner-Knopoff con Reasenberg. Cargar la capa `Entidades` del censo para sumar la población rural dispersa. | Mejoras de calidad. |
 
 ---

@@ -15,7 +15,7 @@ La asignación de comunas (`event_administrative_area`) usa el polígono complet
 | Antofagasta | 30.702 km² | 61,2 km² (0,2 %) | 388.478 |
 | Santiago | 23 km² | 23,1 km² (100 %) | 432.081 |
 
-"216 sismos Mw≥5 en la comuna de Calama" no significa "216 sismos bajo la ciudad de Calama": de esos 216 epicentros, **solo 1** cae dentro de la ciudad (consulta 14). La cartografía del Censo 2024 trae los polígonos de cada ciudad y pueblo y su población, y con eso se puede preguntar lo que importa.
+"217 sismos Mw≥5 en la comuna de Calama" no significa "217 sismos bajo la ciudad de Calama": de esos 217 epicentros, **solo 1** cae dentro de la ciudad (consulta 14). La cartografía del Censo 2024 trae los polígonos de cada ciudad y pueblo y su población, y con eso se puede preguntar lo que importa.
 
 ---
 
@@ -75,8 +75,8 @@ erDiagram
 | `urban_area` | Ciudades y pueblos con población, viviendas e indicadores. FK a su comuna. | `urban_area_id`; UNIQUE `ine_entity_id` (ID_ENTIDAD del INE) | 592 |
 | `urban_area_part` | Trozos de cada zona urbana (`ST_Subdivide`, ≤ 255 vértices). Técnica, como `administrative_area_part`. | `urban_area_part_id` | 7.259 |
 | `census_block` | Manzanas con población y su **punto interior** (`ST_PointOnSurface`). FK a comuna y, si es urbana, a su zona urbana. | `census_block_id`; UNIQUE `block_code` (MANZENT) | 216.341 |
-| `event_urban_area` | Relación N:M sismo ↔ zona urbana con distancia epicentral e hipocentral y orden (`distance_rank`). | (`earthquake_event_id`, `urban_area_id`) | 376.948 |
-| `event_population_exposure` | Población, mayores de 60 y viviendas de adobe a 25, 50 y 100 km de cada sismo Mw ≥ 5. | `earthquake_event_id` | 6.388 |
+| `event_urban_area` | Relación N:M sismo ↔ zona urbana con distancia epicentral e hipocentral y orden (`distance_rank`). | (`earthquake_event_id`, `urban_area_id`) | 379.691 |
+| `event_population_exposure` | Población, mayores de 60 y viviendas de adobe a 25, 50 y 100 km de cada sismo Mw ≥ 5. | `earthquake_event_id` | 6.403 |
 
 ### Reglas de `event_urban_area`
 
@@ -93,7 +93,7 @@ Medir la distancia de un punto a un polígono sobre `geography` (el elipsoide, e
 1. **Aproximada:** `ST_ClosestPoint` busca, en el plano, el punto del trozo más cercano al epicentro, y solo se mide sobre el elipsoide la distancia entre esos dos puntos. Ese punto está sobre el trozo, así que la aproximada **nunca es menor** que la exacta; en las pruebas se alejó en promedio 4 m y como máximo 0,4 km.
 2. **Exacta:** `ST_Distance` sobre `geography`, solo contra los trozos cuya aproximada está a menos de 2 km de la mejor. Como la aproximada nunca subestima y su error es mucho menor que 2 km, el trozo realmente más cercano siempre queda entre los medidos.
 
-**Verificación (2026-11-07):** se comparó con el cálculo exacto completo. Los 376.948 vínculos, sus distancias al metro, su orden y la población de los 6.388 sismos coinciden **sin ninguna diferencia**. Una primera versión, que medía exacto solo el trozo ganador, dejaba 3.830 distancias hasta 0,3 km más largas y cambiaba la zona más cercana de 9 sismos; por eso se agregó el margen.
+**Verificación (2026-11-07, con los datos de ese día):** se comparó con el cálculo exacto completo. Los 376.948 vínculos, sus distancias al metro, su orden y la población de los 6.388 sismos coinciden **sin ninguna diferencia**. Una primera versión, que medía exacto solo el trozo ganador, dejaba 3.830 distancias hasta 0,3 km más largas y cambiaba la zona más cercana de 9 sismos; por eso se agregó el margen.
 
 ### Regla de `event_population_exposure`
 
@@ -176,7 +176,7 @@ El modo incremental **no detecta** un sismo ya calculado al que la fuente le cor
 
 ---
 
-## 5. Resultados de la carga (2026-11-06)
+## 5. Resultados de la carga (2026-11-06; cifras de sismos con datos al 2026-11-11)
 
 | Verificación | Resultado |
 |---|---|
@@ -187,40 +187,40 @@ El modo incremental **no detecta** un sismo ya calculado al que la fuente le cor
 | Geometrías | Ninguna vacía o inválida (control automático). |
 | Trozos de zona urbana | 7.259, cada uno con 255 vértices o menos (las zonas urbanas suman 888 mil vértices; la mayor tiene 58.749). |
 | Idempotencia | Carga 15: 592 zonas insertadas. Carga 16 (repetida): 0 insertadas y 592 actualizadas; mismas cifras. |
-| Zona más cercana | 57.531 de 57.531 sismos (control automático). |
+| Zona más cercana | 59.534 de 59.534 sismos (control automático). |
 | Exactitud del método en dos etapas | 0 diferencias contra el cálculo exacto (sección 3). |
 | Modo incremental | Se borraron los resultados de 300 sismos (150 con Mw ≥ 5) y el modo incremental los reconstruyó idénticos en 17 s. |
-| Tiempos | Carga del censo: 27 s. Cercanía y población (modo completo): 10–12 min. Las 14 consultas de `queries.sql`: 0,7 s en total. |
-| Tamaño en disco | `census_block` 263 MB, `event_urban_area` 50 MB, `urban_area` 29 MB, `urban_area_part` 16 MB, `event_population_exposure` 0,6 MB. Base completa: 906 MB. |
+| Tiempos | Carga del censo: 27 s. Cercanía y población (modo completo): 10–12 min. Las 15 consultas de `queries.sql`: 0,75 s en total. |
+| Tamaño en disco | `census_block` 263 MB, `event_urban_area` 51 MB, `urban_area` 29 MB, `urban_area_part` 16 MB, `event_population_exposure` 0,6 MB. Base completa: 906 MB el 07-11 y 937 MB el 11-11, con las tablas de análisis. |
 
 **¿Qué tan cerca de una zona urbana ocurren los sismos?** (zona urbana más cercana a cada sismo)
 
 | Distancia del epicentro al borde de la zona urbana más cercana | Sismos | % |
 |---|---:|---:|
-| 0 km (epicentro dentro de una ciudad o pueblo) | 167 | 0,3 % |
-| 0–10 km | 3.617 | 6,3 % |
-| 10–50 km | 18.813 | 32,7 % |
-| 50–100 km | 13.820 | 24,0 % |
-| 100–200 km | 13.756 | 23,9 % |
-| > 200 km | 7.358 | 12,8 % |
-| **Total** | **57.531** | 100 % |
+| 0 km (epicentro dentro de una ciudad o pueblo) | 168 | 0,3 % |
+| 0–10 km | 3.725 | 6,3 % |
+| 10–50 km | 19.428 | 32,6 % |
+| 50–100 km | 14.468 | 24,3 % |
+| 100–200 km | 14.357 | 24,1 % |
+| > 200 km | 7.388 | 12,4 % |
+| **Total** | **59.534** | 100 % |
 
-En promedio, la zona urbana más cercana está a 108 km del epicentro.
+En promedio, la zona urbana más cercana está a 107 km del epicentro.
 
-**Sismos Mw ≥ 5 (6.388):** cada uno tiene en promedio 51 zonas urbanas a 200 km o menos (máximo 300). 2.662 tienen población censada a 50 km o menos del epicentro, y 658 tienen más de un millón de personas a 100 km o menos.
+**Sismos Mw ≥ 5 (6.403):** cada uno tiene en promedio 51 zonas urbanas a 200 km o menos (máximo 300). 2.670 tienen población censada a 50 km o menos del epicentro, y 658 tienen más de un millón de personas a 100 km o menos.
 
 ---
 
 ## 6. Consultas de ejemplo
 
-Están en `db/queries.sql` (consultas 11 a 14). Requieren el censo cargado y corren en milisegundos.
+Están en `db/queries.sql` (consultas 11 a 14). Requieren el censo cargado y corren en milisegundos. Resultados con datos al 11-11-2026.
 
 | # | Pregunta | Resultado destacado |
 |---|---|---|
 | 11 | Zona urbana más cercana a los 10 sismos de mayor Mw | Valdivia 1960 (Mw 9,55): Contulmo, a 19,7 km del epicentro y 31,8 km del hipocentro. Maule 2010 (Mw 8,79): Cobquecura, a 9,0 km. |
-| 12 | Los 10 sismos Mw ≥ 6 desde 1960 con más población a 50 km | Encabeza Los Andes 1983 (Mw 6,0; 99 km de profundidad): 2,0 millones de personas a 50 km y 7,4 millones a 100 km. Siguen varios de la secuencia de Valparaíso de 1985; el principal (Mw 7,36) tuvo 1,2 millones a 50 km y 4,0 millones a 100 km. |
-| 13 | Ciudades (conurbaciones como una sola) con más sismos Mw ≥ 5 a ≤ 100 km del hipocentro | Litoral central: Algarrobo–El Quisco–El Tabo (399), San Antonio (389), Gran Valparaíso (340), La Serena–Coquimbo (306). |
-| 14 | Comuna versus ciudad: de los sismos Mw ≥ 5 con epicentro dentro de la comuna, cuántos caen dentro de una zona urbana | Calama: 216 en la comuna, **1** en la ciudad (profundidad media 112 km). Antofagasta: 124 y 0 (66 km). Ocurren bajo el resto de la comuna (desierto, cordillera), no bajo la ciudad. |
+| 12 | Los 10 sismos Mw ≥ 6 desde 1960 con más población a 50 km | Encabeza Los Andes 1983 (Mw 6,0; 99 km de profundidad; comuna de Los Andes, Región de Valparaíso): 2,0 millones de personas a 50 km y 7,4 millones a 100 km. Siguen varios de la secuencia de Valparaíso de 1985. El terremoto principal (03-03-1985, Mw 7,95, en el mar frente a Casablanca) no entra en la lista: 1,04 millones a 50 km. El Mw 7,36 que aparece es su mayor réplica, 1 h 45 min después (1,2 millones a 50 km y 4,0 millones a 100 km). |
+| 13 | Ciudades (conurbaciones como una sola) con más sismos Mw ≥ 5 a ≤ 100 km del hipocentro | Litoral central: Algarrobo–El Quisco–El Tabo (401), San Antonio–Cartagena (391), Gran Valparaíso (340), La Serena–Coquimbo (308). |
+| 14 | Comuna versus ciudad: de los sismos Mw ≥ 5 con epicentro dentro de la comuna, cuántos caen dentro de una zona urbana | Calama: 217 en la comuna, **1** en la ciudad (profundidad media 112 km). Antofagasta: 124 y 0 (66 km). Ocurren bajo el resto de la comuna (desierto, cordillera), no bajo la ciudad. |
 
 **Por qué la consulta 12 empieza en 1960:** sin ese filtro la encabezan sismos de los siglos XVI a XIX con el mismo epicentro repetido en Vitacura. Antes de ~1960 los epicentros tienen errores de decenas de km, así que su población cercana no es confiable.
 
