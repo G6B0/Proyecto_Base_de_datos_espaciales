@@ -102,6 +102,14 @@ try {
         throw 'El calculo de Mw homogeneo fallo; los eventos cargados se conservan.'
     }
 
+    # Todas las magnitudes publicadas de cada evento (relacion 1:N).
+    Write-Host 'Registrando magnitudes por evento (db/load_magnitude_estimates.sql)'
+    & $psql -h 127.0.0.1 -p $databasePort -U $databaseUser -d $databaseName `
+        -v ON_ERROR_STOP=1 -f (Join-Path $projectRoot 'db\load_magnitude_estimates.sql')
+    if ($LASTEXITCODE -ne 0) {
+        throw 'El registro de magnitudes por evento fallo; los eventos cargados se conservan.'
+    }
+
     # Si la DPA ya esta cargada, se recalcula la comuna de cada evento para
     # incluir los sismos nuevos o con ubicacion revisada.
     $communeParts = & $psql -h 127.0.0.1 -p $databasePort -U $databaseUser -d $databaseName `

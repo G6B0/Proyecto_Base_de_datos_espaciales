@@ -59,7 +59,7 @@ La base cuenta con:
 - índices temporales, de magnitud y espaciales GiST, más trozos de comuna (`ST_Subdivide`) para consultas rápidas;
 - carga transaccional e idempotente con `UPSERT`;
 - historial de cargas en `seismic.ingestion_run`;
-- 14 consultas básicas por región, comuna, distancia, profundidad, densidad, zona urbana y población en [`db/queries.sql`](db/queries.sql).
+- 15 consultas básicas por región, comuna, distancia, profundidad, densidad, tiempo, zona urbana y población en [`db/queries.sql`](db/queries.sql).
 
 El modelo lógico v2, la carga de la DPA y el diseño de las próximas etapas (réplicas, intensidad USGS) están documentados en [`docs/MODELO_LOGICO_v2.md`](docs/MODELO_LOGICO_v2.md).
 
