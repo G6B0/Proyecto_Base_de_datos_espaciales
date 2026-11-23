@@ -1,0 +1,426 @@
+<!DOCTYPE html><html lang="es-CL"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sismos Chile · Observatorio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --map-ocean: #030405;
+      --fg: #ffffff;
+      --fg-2: rgba(255,255,255,0.70);
+      --fg-3: rgba(255,255,255,0.45);
+      --line: rgba(255,255,255,0.10);
+    }
+    body { background-color: var(--map-ocean); color: var(--fg); font-family: 'Inter', sans-serif; overflow: hidden; margin: 0; }
+    .font-instrument { font-family: 'Instrument Serif', serif; text-shadow: 0 0 72px rgba(0,0,0,.42), 0 4px 28px rgba(0,0,0,.28); }
+    .font-mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+    .text-fg-2 { color: var(--fg-2); }
+    .text-fg-3 { color: var(--fg-3); }
+    .border-line { border-color: var(--line); }
+
+    .liquid-glass {
+      background: rgba(0, 0, 0, 0.35);
+      background-blend-mode: luminosity;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+    .liquid-glass::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
+      background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.15) 20%,
+        rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,.15) 80%, rgba(255,255,255,.45) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+    }
+    .liquid-glass-circle {
+      background-blend-mode: luminosity;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      position: relative; overflow: hidden; border-radius: 9999px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .liquid-glass-circle::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
+      background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.22) 30%,
+        rgba(255,255,255,.16) 50%, rgba(255,255,255,.22) 70%, rgba(255,255,255,.45) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+    }
+
+    .c-mw-3 { background-color: #3b1c4a; }
+    .c-mw-4 { background-color: #8a2be2; }
+    .c-mw-45 { background-color: #c2185b; }
+    .c-mw-5 { background-color: #f4511e; }
+    .c-mw-6 { background-color: #ffa726; }
+    .c-mw-7 { background-color: #ffe082; }
+    .c-mw-8 { background-color: #fffde7; }
+    .bg-mmi-8 { background-color: #ffc800; color: #000; }
+
+    .slider-track { height: 2px; background: var(--line); position: relative; border-radius: 1px; margin: 10px 0; }
+    .slider-fill { position: absolute; height: 100%; background: var(--fg); }
+    .slider-thumb { width: 12px; height: 12px; background: var(--fg); border-radius: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); }
+
+    .toggle { width: 34px; height: 20px; border-radius: 9999px; background: rgba(255,255,255,0.12); position: relative; flex-shrink: 0; }
+    .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 9999px; background: rgba(255,255,255,0.55); }
+    .toggle.on { background: #ffffff; }
+    .toggle.on::after { left: 17px; background: #000000; }
+
+    @keyframes pulse-live { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(.8); } }
+    .animate-live { animation: pulse-live 2s infinite ease-in-out; }
+    @keyframes ring-pulse { 0% { r: 16; opacity: .55; } 100% { r: 46; opacity: 0; } }
+    .ring-pulse { animation: ring-pulse 2.4s infinite ease-out; transform-box: fill-box; }
+  </style>
+</head>
+<body>
+  <div class="w-full h-screen relative" style="min-height: 1080px;">
+
+    <!-- Mapa base real: 60.846 sismos unicos de PostGIS coloreados por Mw (scripts/render_ui_basemap.py) -->
+    <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/562da62f-78e2-42c5-a41f-a573b77052ac/content-assets/basemap-explorar-1920x1080/basemap_explorar.png"
+         alt="Mapa de Chile con 60.846 sismos coloreados por magnitud"
+         class="absolute inset-0 w-full h-full object-cover select-none pointer-events-none" style="z-index: 0;">
+
+    <!-- Seleccion: Maule 2010 en el pixel (922, 545) del mapa; linea guia hacia la ficha -->
+    <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 5;" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+      <line x1="938" y1="537" x2="1556" y2="214" stroke="rgba(255,255,255,0.4)" stroke-width="1" stroke-dasharray="3 4"></line>
+      <circle cx="922" cy="545" r="16" fill="none" stroke="#ffffff" stroke-width="1.5" class="ring-pulse"></circle>
+      <circle cx="922" cy="545" r="14" fill="none" stroke="#ffffff" stroke-width="2"></circle>
+      <circle cx="922" cy="545" r="28" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1"></circle>
+      <text x="954" y="586" fill="rgba(255,255,255,0.85)" font-family="JetBrains Mono, monospace" font-size="12">Mw 8,8 · 2010</text>
+    </svg>
+
+    <!-- BARRA SUPERIOR -->
+    <header class="absolute top-6 left-6 right-6 flex justify-between items-center" style="z-index: 20;">
+      <div class="w-[340px]"></div>
+      <nav class="liquid-glass rounded-full px-2 py-2 flex items-center gap-1">
+        <div class="flex items-center gap-3 px-4 py-2 mr-2">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" aria-hidden="true">
+            <path d="M4.21 16.5 A9 9 0 0 1 16.5 4.21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M16.5 4.21 A9 9 0 0 1 19.79 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.4 2.3"></path>
+            <path d="M19.79 16.5 A9 9 0 0 1 4.21 16.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.01 4.7"></path>
+            <circle cx="12" cy="12" r="2.5" fill="currentColor"></circle>
+          </svg>
+          <span class="font-semibold text-sm tracking-tight">Sismos Chile</span>
+        </div>
+        <div class="w-px h-4 bg-white/10 mx-1"></div>
+        <button class="px-5 py-2 rounded-full bg-white text-black text-sm font-medium">Explorar</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Replay</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Placa 3D</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Anatomía</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Mi comuna</button>
+      </nav>
+      <div class="flex items-center gap-4 w-[340px] justify-end">
+        <div class="liquid-glass rounded-full flex items-center px-4 py-2.5 w-56">
+          <iconify-icon icon="lucide:search" class="text-fg-3 text-sm mr-2"></iconify-icon>
+          <input type="text" placeholder="Buscar comuna o ciudad…" class="bg-transparent border-none outline-none text-sm text-white w-full placeholder:text-[var(--fg-3)]">
+        </div>
+        <div class="liquid-glass rounded-full flex items-center gap-2 px-3 py-2 text-xs text-fg-2 whitespace-nowrap">
+          <div class="w-1.5 h-1.5 bg-white rounded-full animate-live"></div>
+          PostGIS en vivo
+        </div>
+      </div>
+    </header>
+
+    <!-- PANEL IZQUIERDO: FILTROS -->
+    <aside class="liquid-glass rounded-3xl p-6 w-[340px] flex flex-col gap-6 absolute left-6 top-[104px]" style="z-index: 20;">
+      <div>
+        <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-2">Filtros</div>
+        <div class="font-instrument text-7xl tracking-tight leading-none">61.133</div>
+        <div class="font-mono text-xs text-fg-2 uppercase tracking-widest mt-2">Sismos únicos · 1513–2026</div>
+        <div class="font-mono text-[11px] text-fg-3 mt-1">90.352 registros · 29.219 pares CSN–USGS</div>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Años</span>
+          <span class="font-mono text-sm">1906 – 2026</span>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="left: 0; right: 0;"></div>
+          <div class="slider-thumb" style="left: 0"></div>
+          <div class="slider-thumb" style="left: 100%"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Magnitud (Mw)</span>
+          <span class="font-mono text-sm">≥ 4,0</span>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="left: 15%; right: 0;"></div>
+          <div class="slider-thumb" style="left: 15%"></div>
+        </div>
+        <div class="flex mt-3 h-1.5 rounded-full overflow-hidden">
+          <div class="flex-1 c-mw-3"></div><div class="flex-1 c-mw-4"></div><div class="flex-1 c-mw-45"></div>
+          <div class="flex-1 c-mw-5"></div><div class="flex-1 c-mw-6"></div><div class="flex-1 c-mw-7"></div><div class="flex-1 c-mw-8"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Profundidad</span>
+          <span class="font-mono text-sm">0 – 700 km</span>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="left: 0; right: 0;"></div>
+          <div class="slider-thumb" style="left: 0"></div>
+          <div class="slider-thumb" style="left: 100%"></div>
+        </div>
+      </div>
+
+      <div class="border-t border-line pt-5">
+        <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-2">Región</div>
+        <button class="w-full flex justify-between items-center py-1 text-sm text-fg-2 hover:text-white">
+          <span>Todas las regiones</span>
+          <iconify-icon icon="lucide:chevron-down"></iconify-icon>
+        </button>
+      </div>
+
+      <div class="border-t border-line pt-5">
+        <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-3">Fuente</div>
+        <div class="flex gap-2">
+          <button class="flex-1 py-1.5 rounded-full bg-white text-black text-xs font-medium">Ambas</button>
+          <button class="flex-1 py-1.5 rounded-full text-fg-2 text-xs border border-white/15">CSN</button>
+          <button class="flex-1 py-1.5 rounded-full text-fg-2 text-xs border border-white/15">USGS</button>
+        </div>
+      </div>
+
+      <div class="border-t border-line pt-5 flex flex-col gap-3 text-sm">
+        <label class="flex items-center justify-between gap-3"><span class="text-fg-2">Ocultar réplicas</span><span class="toggle"></span></label>
+        <label class="flex items-center justify-between gap-3"><span class="text-fg-2">Zonas calientes (Gi*)</span><span class="toggle"></span></label>
+      </div>
+    </aside>
+
+    <!-- PANEL DERECHO: SISMO SELECCIONADO -->
+    <aside class="liquid-glass rounded-3xl p-6 w-[340px] absolute right-6 top-[104px]" style="z-index: 20;">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="w-2 h-2 rounded-full bg-white"></span>
+        <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Sismo seleccionado</span>
+      </div>
+      <h2 class="font-instrument text-[64px] leading-none tracking-tight">Maule 2010</h2>
+      <div class="font-mono text-xs text-fg-2 mt-2">27-02-2010 · 06:34 UTC</div>
+
+      <div class="grid grid-cols-3 gap-2 mt-5 mb-5">
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Mw</div>
+          <div class="font-mono text-2xl mt-0.5">8,8</div>
+        </div>
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Prof.</div>
+          <div class="font-mono text-2xl mt-0.5">25<span class="text-sm text-fg-3"> km</span></div>
+        </div>
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">MMI máx</div>
+          <div class="flex items-center gap-1.5 mt-0.5"><span class="font-mono text-2xl">8,2</span><span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-mmi-8">VIII</span></div>
+        </div>
+      </div>
+
+      <div class="flex flex-col text-sm">
+        <div class="flex justify-between gap-4 border-b border-line py-2.5">
+          <span class="text-fg-3">Comuna</span>
+          <span class="text-right">Cobquecura (Ñuble)<br><span class="font-mono text-xs text-fg-3">2,6 km mar adentro</span></span>
+        </div>
+        <div class="flex justify-between gap-4 border-b border-line py-2.5">
+          <span class="text-fg-3">Zona urbana más cercana</span>
+          <span class="text-right">Cobquecura<br><span class="font-mono text-xs text-fg-3">9,0 km</span></span>
+        </div>
+        <div class="border-b border-line py-2.5">
+          <div class="text-fg-3 mb-2">Población a 25 · 50 · 100 km</div>
+          <div class="grid grid-cols-3 font-mono">
+            <span>2.382</span><span>79.135</span><span>1,35 M</span>
+          </div>
+        </div>
+        <div class="flex justify-between gap-4 border-b border-line py-2.5">
+          <span class="text-fg-3">Papel en la secuencia</span>
+          <span class="text-right">Sismo principal<br><span class="font-mono text-xs text-fg-3">941 réplicas</span></span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 mt-4">
+        <span class="px-3 py-1 rounded-full border border-white/15 text-xs text-fg-2">También publicado por USGS</span>
+      </div>
+      <button class="w-full mt-4 bg-white text-black rounded-full py-3 text-sm font-medium hover:scale-[1.02] transition-transform">Ver anatomía del terremoto →</button>
+    </aside>
+
+    <!-- LEYENDA -->
+    <div class="liquid-glass rounded-3xl px-5 py-4 absolute right-[88px] bottom-[128px]" style="z-index: 20;">
+      <div class="text-[11px] uppercase tracking-[.08em] text-fg-3 mb-3">Magnitud (Mw)</div>
+      <div class="flex items-end gap-4">
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-4" style="width:4px;height:4px;"></span><span class="font-mono text-[11px] text-fg-2">4</span></div>
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-5" style="width:6px;height:6px;"></span><span class="font-mono text-[11px] text-fg-2">5</span></div>
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-6" style="width:9px;height:9px;"></span><span class="font-mono text-[11px] text-fg-2">6</span></div>
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-7" style="width:13px;height:13px;"></span><span class="font-mono text-[11px] text-fg-2">7</span></div>
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-8" style="width:18px;height:18px;box-shadow:0 0 14px 3px rgba(255,253,231,.45);"></span><span class="font-mono text-[11px] text-fg-2">8+</span></div>
+      </div>
+    </div>
+
+    <!-- CREDITOS -->
+    <div class="absolute left-6 bottom-[132px] text-[11px] text-fg-3" style="z-index: 20;">
+      Datos: CSN · USGS ComCat · DPA 2023 (SUBDERE/IDE Chile) · Censo 2024 (INE)
+    </div>
+
+    <!-- LINEA DE TIEMPO: sismos Mw >= 4 por ano, 1906-2026 (datos reales, escala raiz cuadrada) -->
+    <div class="liquid-glass rounded-full absolute left-6 right-[88px] bottom-6 h-[88px] px-4 flex items-center gap-4" style="z-index: 20;">
+      <button class="liquid-glass-circle w-14 h-14 text-white flex-shrink-0">
+        <iconify-icon icon="lucide:play" class="text-xl ml-0.5"></iconify-icon>
+      </button>
+      <div class="flex gap-1 flex-shrink-0">
+        <button class="px-2.5 py-1 rounded-full bg-white text-black text-xs font-mono">1×</button>
+        <button class="px-2.5 py-1 rounded-full text-fg-2 text-xs font-mono border border-white/15">10×</button>
+        <button class="px-2.5 py-1 rounded-full text-fg-2 text-xs font-mono border border-white/15">100×</button>
+      </div>
+      <div class="flex-1 relative h-[60px]">
+        <div class="absolute left-0 right-0 top-1 h-[38px] flex items-end gap-[2px]">
+          <div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.4" title="1906: 10 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.4" title="1907: 5 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.4" title="1908: 3 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.4" title="1909: 3 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.4" title="1910: 2 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.4" title="1911: 1 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.4" title="1912: 0 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.4" title="1913: 5 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.4" title="1914: 5 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.4" title="1915: 4 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.4" title="1916: 3 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.4" title="1917: 3 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.4" title="1918: 4 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.4" title="1919: 7 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.4" title="1920: 9 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.4" title="1921: 2 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.4" title="1922: 12 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.4" title="1923: 8 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.4" title="1924: 8 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.4" title="1925: 4 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1926: 15 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.4" title="1927: 19 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:10%;opacity:0.4" title="1928: 35 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.4" title="1929: 19 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1930: 14 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1931: 15 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.4" title="1932: 23 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.4" title="1933: 21 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.4" title="1934: 21 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.4" title="1935: 19 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1936: 17 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1937: 18 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.4" title="1938: 9 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.4" title="1939: 19 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1940: 18 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.4" title="1941: 11 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.4" title="1942: 8 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1943: 17 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.4" title="1944: 7 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.4" title="1945: 5 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.4" title="1946: 13 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.4" title="1947: 11 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.4" title="1948: 11 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1949: 17 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1950: 17 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1951: 15 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.4" title="1952: 12 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1953: 14 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1954: 18 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1955: 18 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1956: 18 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.4" title="1957: 17 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.4" title="1958: 23 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:10%;opacity:0.4" title="1959: 30 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:17%;opacity:0.9" title="1960: 94 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:10%;opacity:0.4" title="1961: 35 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:10%;opacity:0.4" title="1962: 35 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:15%;opacity:0.4" title="1963: 77 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.4" title="1964: 212 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:27%;opacity:0.4" title="1965: 226 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:32%;opacity:0.4" title="1966: 327 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:32%;opacity:0.4" title="1967: 321 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:27%;opacity:0.4" title="1968: 237 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.4" title="1969: 214 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:27%;opacity:0.4" title="1970: 232 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:29%;opacity:0.4" title="1971: 268 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.4" title="1972: 218 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:32%;opacity:0.4" title="1973: 334 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:27%;opacity:0.4" title="1974: 234 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.4" title="1975: 213 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:23%;opacity:0.4" title="1976: 166 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:29%;opacity:0.4" title="1977: 271 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:22%;opacity:0.4" title="1978: 161 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:25%;opacity:0.4" title="1979: 197 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:23%;opacity:0.4" title="1980: 166 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:25%;opacity:0.4" title="1981: 197 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:24%;opacity:0.4" title="1982: 182 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.4" title="1983: 214 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:25%;opacity:0.4" title="1984: 203 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:38%;opacity:0.9" title="1985: 458 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:29%;opacity:0.4" title="1986: 276 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:44%;opacity:0.4" title="1987: 617 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.4" title="1988: 692 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:40%;opacity:0.4" title="1989: 511 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:40%;opacity:0.4" title="1990: 507 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:42%;opacity:0.4" title="1991: 558 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.4" title="1992: 682 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:44%;opacity:0.4" title="1993: 635 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:45%;opacity:0.4" title="1994: 662 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:54%;opacity:0.4" title="1995: 950 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:44%;opacity:0.4" title="1996: 609 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:50%;opacity:0.4" title="1997: 808 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:53%;opacity:0.4" title="1998: 903 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.4" title="1999: 671 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:44%;opacity:0.4" title="2000: 615 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:66%;opacity:0.4" title="2001: 1.404 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:52%;opacity:0.4" title="2002: 860 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:47%;opacity:0.4" title="2003: 706 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.4" title="2004: 676 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:49%;opacity:0.4" title="2005: 767 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:52%;opacity:0.4" title="2006: 863 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:53%;opacity:0.4" title="2007: 917 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:48%;opacity:0.4" title="2008: 745 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.4" title="2009: 676 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:100%;opacity:0.9" title="2010: 3.210 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:61%;opacity:0.4" title="2011: 1.206 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:55%;opacity:0.4" title="2012: 979 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:62%;opacity:0.4" title="2013: 1.250 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:72%;opacity:0.9" title="2014: 1.647 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:81%;opacity:0.9" title="2015: 2.092 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:62%;opacity:0.4" title="2016: 1.232 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:65%;opacity:0.4" title="2017: 1.373 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:58%;opacity:0.4" title="2018: 1.077 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:57%;opacity:0.4" title="2019: 1.045 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:61%;opacity:0.4" title="2020: 1.185 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:60%;opacity:0.4" title="2021: 1.167 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:59%;opacity:0.4" title="2022: 1.114 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:58%;opacity:0.4" title="2023: 1.075 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:56%;opacity:0.4" title="2024: 1.024 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:51%;opacity:0.4" title="2025: 829 sismos Mw ≥ 4"></div>
+          <div class="flex-1 rounded-t-sm bg-white" style="height:45%;opacity:0.4" title="2026: 643 sismos Mw ≥ 4"></div>
+        </div>
+        <div class="absolute left-0 right-0 bottom-0 h-3">
+          <span class="absolute font-mono text-[10px] text-fg-3" style="left:0.00%;transform:translateX(0)">1906</span>
+          <span class="absolute font-mono text-[10px] text-fg-3" style="left:20.00%;transform:translateX(-50%)">1930</span>
+          <span class="absolute font-mono text-[10px] text-fg-3" style="left:45.00%;transform:translateX(-50%)">1960</span>
+          <span class="absolute font-mono text-[10px] text-fg-3" style="left:70.00%;transform:translateX(-50%)">1990</span>
+          <span class="absolute font-mono text-[10px] text-fg-3" style="left:100.00%;transform:translateX(-100%)">2026</span>
+        </div>
+      </div>
+      <div class="text-right pr-3 flex-shrink-0">
+        <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Rango</div>
+        <div class="font-mono text-sm">1906 – 2026</div>
+      </div>
+    </div>
+
+    <!-- CONTROLES DEL MAPA -->
+    <div class="absolute right-6 bottom-6 flex flex-col gap-2" style="z-index: 20;">
+      <button class="liquid-glass-circle w-12 h-12 text-white"><iconify-icon icon="lucide:layers"></iconify-icon></button>
+      <button class="liquid-glass-circle w-12 h-12 text-white"><iconify-icon icon="lucide:plus"></iconify-icon></button>
+      <button class="liquid-glass-circle w-12 h-12 text-white"><iconify-icon icon="lucide:minus"></iconify-icon></button>
+      <button class="liquid-glass-circle w-12 h-12 text-white"><iconify-icon icon="lucide:locate"></iconify-icon></button>
+    </div>
+  </div>
+</body></html>

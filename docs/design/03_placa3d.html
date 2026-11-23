@@ -1,0 +1,173 @@
+<!DOCTYPE html><html lang="es-CL"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sismos Chile · Observatorio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --map-ocean: #030405;
+      --fg: #ffffff;
+      --fg-2: rgba(255,255,255,0.70);
+      --fg-3: rgba(255,255,255,0.45);
+      --line: rgba(255,255,255,0.10);
+    }
+    body { background-color: var(--map-ocean); color: var(--fg); font-family: 'Inter', sans-serif; overflow: hidden; margin: 0; }
+    .font-instrument { font-family: 'Instrument Serif', serif; text-shadow: 0 0 72px rgba(0,0,0,.42), 0 4px 28px rgba(0,0,0,.28); }
+    .font-mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+    .text-fg-2 { color: var(--fg-2); }
+    .text-fg-3 { color: var(--fg-3); }
+    .border-line { border-color: var(--line); }
+
+    .liquid-glass {
+      background: rgba(0, 0, 0, 0.35);
+      background-blend-mode: luminosity;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+    .liquid-glass::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
+      background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.15) 20%,
+        rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,.15) 80%, rgba(255,255,255,.45) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+    }
+    .liquid-glass-circle {
+      background-blend-mode: luminosity;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      position: relative; overflow: hidden; border-radius: 9999px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .liquid-glass-circle::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
+      background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.22) 30%,
+        rgba(255,255,255,.16) 50%, rgba(255,255,255,.22) 70%, rgba(255,255,255,.45) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+    }
+
+    .c-mw-3 { background-color: #3b1c4a; }
+    .c-mw-4 { background-color: #8a2be2; }
+    .c-mw-45 { background-color: #c2185b; }
+    .c-mw-5 { background-color: #f4511e; }
+    .c-mw-6 { background-color: #ffa726; }
+    .c-mw-7 { background-color: #ffe082; }
+    .c-mw-8 { background-color: #fffde7; }
+    .bg-mmi-8 { background-color: #ffc800; color: #000; }
+
+    .slider-track { height: 2px; background: var(--line); position: relative; border-radius: 1px; margin: 10px 0; }
+    .slider-fill { position: absolute; height: 100%; background: var(--fg); }
+    .slider-thumb { width: 12px; height: 12px; background: var(--fg); border-radius: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); }
+
+    .toggle { width: 34px; height: 20px; border-radius: 9999px; background: rgba(255,255,255,0.12); position: relative; flex-shrink: 0; }
+    .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 9999px; background: rgba(255,255,255,0.55); }
+    .toggle.on { background: #ffffff; }
+    .toggle.on::after { left: 17px; background: #000000; }
+
+    @keyframes pulse-live { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(.8); } }
+    .animate-live { animation: pulse-live 2s infinite ease-in-out; }
+    @keyframes ring-pulse { 0% { r: 16; opacity: .55; } 100% { r: 46; opacity: 0; } }
+    .ring-pulse { animation: ring-pulse 2.4s infinite ease-out; transform-box: fill-box; }
+
+    .c-d-1 { background-color: #7dd3fc; } .c-d-2 { background-color: #38bdf8; }
+    .c-d-3 { background-color: #6366f1; } .c-d-4 { background-color: #a855f7; }
+    .mmi-5 { background-color: #80ffff; } .mmi-6 { background-color: #7aff93; }
+    .mmi-7 { background-color: #ffff00; } .mmi-8 { background-color: #ffc800; }
+    .bg-chip { background: rgba(255,255,255,0.06); }
+    @keyframes wave { 0% { r: 20; opacity: .7; } 100% { r: 220; opacity: 0; } }
+    .wave { animation: wave 3s infinite ease-out; transform-box: fill-box; }
+    .wave-2 { animation-delay: 1s; } .wave-3 { animation-delay: 2s; }
+  </style>
+</head>
+<body>
+  <div class="w-full h-screen relative" style="min-height: 1080px;">
+    <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/562da62f-78e2-42c5-a41f-a573b77052ac/content-assets/mode-placa-3d/placa3d.png" alt="Sismos de Chile en 3D según su profundidad" class="absolute inset-0 w-full h-full object-cover select-none pointer-events-none" style="z-index: 0;">
+    <header class="absolute top-6 left-6 right-6 flex justify-between items-center" style="z-index: 20;">
+      <div class="w-[340px]"></div>
+      <nav class="liquid-glass rounded-full px-2 py-2 flex items-center gap-1">
+        <div class="flex items-center gap-3 px-4 py-2 mr-2">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" aria-hidden="true">
+            <path d="M4.21 16.5 A9 9 0 0 1 16.5 4.21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M16.5 4.21 A9 9 0 0 1 19.79 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.4 2.3"></path>
+            <path d="M19.79 16.5 A9 9 0 0 1 4.21 16.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.01 4.7"></path>
+            <circle cx="12" cy="12" r="2.5" fill="currentColor"></circle>
+          </svg>
+          <span class="font-semibold text-sm tracking-tight">Sismos Chile</span>
+        </div>
+        <div class="w-px h-4 bg-white/10 mx-1"></div>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Explorar</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Replay</button>
+        <button class="px-5 py-2 rounded-full bg-white text-black font-medium text-sm">Placa 3D</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Anatomía</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Mi comuna</button>
+      </nav>
+      <div class="flex items-center gap-4 w-[340px] justify-end">
+        <div class="liquid-glass rounded-full flex items-center px-4 py-2.5 w-56">
+          <iconify-icon icon="lucide:search" class="text-fg-3 text-sm mr-2"></iconify-icon>
+          <input type="text" placeholder="Buscar comuna o ciudad…" class="bg-transparent border-none outline-none text-sm text-white w-full placeholder:text-[var(--fg-3)]">
+        </div>
+        <div class="liquid-glass rounded-full flex items-center gap-2 px-3 py-2 text-xs text-fg-2 whitespace-nowrap">
+          <div class="w-1.5 h-1.5 bg-white rounded-full animate-live"></div>
+          PostGIS en vivo
+        </div>
+      </div>
+    </header>
+    <div class="absolute left-6 top-[104px] w-[620px]" style="z-index: 20;">
+      <div class="text-[13px] uppercase tracking-[.08em] text-fg-2 mb-1" style="text-shadow: 0 0 12px rgba(0,0,0,.95);">Placa 3D · vista desde el oeste</div>
+      <div class="font-instrument text-[96px] leading-none tracking-tight">La placa de Nazca</div>
+      <div class="text-lg text-white mt-3" style="text-shadow: 0 0 24px rgba(0,0,0,.95), 0 0 8px rgba(0,0,0,.9), 0 2px 4px rgba(0,0,0,.9);">se hunde bajo Sudamérica unos 7 cm al año. Los sismos dibujan su forma.</div>
+    </div>
+
+    <aside class="liquid-glass rounded-3xl p-6 w-[340px] absolute right-6 top-[104px]" style="z-index: 20;">
+      <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-2">Sismos con profundidad</div>
+      <div class="font-instrument text-6xl leading-none tracking-tight">56.672</div>
+      <div class="font-mono text-xs text-fg-2 mt-2">desde 1960 · 17° a 45° S</div>
+      <div class="flex flex-col text-sm mt-5">
+        <div class="flex items-center justify-between border-b border-line py-2.5"><span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full c-d-1"></span><span class="text-fg-2">Superficiales · &lt; 70 km</span></span><span class="font-mono">27.285</span></div>
+        <div class="flex items-center justify-between border-b border-line py-2.5"><span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full c-d-3"></span><span class="text-fg-2">Intermedios · 70–300 km</span></span><span class="font-mono">29.350</span></div>
+        <div class="flex items-center justify-between border-b border-line py-2.5"><span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full c-d-4"></span><span class="text-fg-2">Profundos · &gt; 300 km</span></span><span class="font-mono">37</span></div>
+        <div class="flex items-center justify-between py-2.5"><span class="text-fg-2">Más profundo</span><span class="font-mono">436 km</span></div>
+      </div>
+      <div class="mt-4">
+        <div class="text-[11px] uppercase tracking-[.08em] text-fg-3 mb-2">Profundidad (km)</div>
+        <div class="flex h-2 rounded-full overflow-hidden"><div class="flex-1 c-d-1"></div><div class="flex-1 c-d-2"></div><div class="flex-1 c-d-3"></div><div class="flex-1 c-d-4"></div></div>
+        <div class="flex justify-between font-mono text-[10px] text-fg-3 mt-1"><span>0</span><span>70</span><span>150</span><span>300</span><span>450</span></div>
+      </div>
+      <div class="border-t border-line mt-5 pt-4 flex flex-col gap-3 text-sm">
+        <div class="flex justify-between items-center"><span class="text-fg-2">Inclinación</span><span class="font-mono">72°</span></div>
+        <div class="slider-track"><div class="slider-fill" style="left:0;right:20%"></div><div class="slider-thumb" style="left:80%"></div></div>
+        <label class="flex items-center justify-between gap-3"><span class="text-fg-2">Exagerar profundidad ×1,5</span><span class="toggle on"></span></label>
+      </div>
+    </aside>
+
+    <div class="liquid-glass rounded-3xl p-5 absolute left-6 bottom-6 w-[980px]" style="z-index: 20;">
+      <div class="flex items-baseline justify-between mb-1">
+        <div>
+          <div class="text-[13px] uppercase tracking-[.08em] text-fg-3">Corte oeste–este · 20° a 24° S</div>
+          <div class="text-sm text-fg-2 mt-1">17.903 sismos: la placa baja desde la fosa hasta unos 300 km bajo los Andes.</div>
+        </div>
+        <div class="flex gap-1">
+          <button class="px-3 py-1 rounded-full bg-white text-black text-xs">Norte · 20–24° S</button>
+          <button class="px-3 py-1 rounded-full text-fg-2 text-xs border border-white/15">Centro · 32–35° S</button>
+          <button class="px-3 py-1 rounded-full text-fg-2 text-xs border border-white/15">Sur · 36–39° S</button>
+        </div>
+      </div>
+      <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/562da62f-78e2-42c5-a41f-a573b77052ac/content-assets/mode-placa-corte/placa_corte.png" alt="Corte de profundidad de los sismos entre 20 y 24 grados sur" class="w-full h-[300px] object-contain">
+    </div>
+
+    <div class="absolute right-6 bottom-6 flex gap-2" style="z-index: 20;">
+      <button class="liquid-glass-circle w-12 h-12 text-white"><iconify-icon icon="lucide:rotate-3d"></iconify-icon></button>
+      <button class="liquid-glass-circle w-12 h-12 text-white"><iconify-icon icon="lucide:plus"></iconify-icon></button>
+      <button class="liquid-glass-circle w-12 h-12 text-white"><iconify-icon icon="lucide:minus"></iconify-icon></button>
+    </div>
+  </div>
+</body></html>
