@@ -1,0 +1,236 @@
+<!DOCTYPE html><html lang="es-CL"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sismos Chile · Observatorio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --map-ocean: #030405;
+      --fg: #ffffff;
+      --fg-2: rgba(255,255,255,0.70);
+      --fg-3: rgba(255,255,255,0.45);
+      --line: rgba(255,255,255,0.10);
+    }
+    body { background-color: var(--map-ocean); color: var(--fg); font-family: 'Inter', sans-serif; overflow: hidden; margin: 0; }
+    .font-instrument { font-family: 'Instrument Serif', serif; text-shadow: 0 0 72px rgba(0,0,0,.42), 0 4px 28px rgba(0,0,0,.28); }
+    .font-mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+    .text-fg-2 { color: var(--fg-2); }
+    .text-fg-3 { color: var(--fg-3); }
+    .border-line { border-color: var(--line); }
+
+    .liquid-glass {
+      background: rgba(0, 0, 0, 0.35);
+      background-blend-mode: luminosity;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+    .liquid-glass::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
+      background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.15) 20%,
+        rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,.15) 80%, rgba(255,255,255,.45) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+    }
+    .liquid-glass-circle {
+      background-blend-mode: luminosity;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      position: relative; overflow: hidden; border-radius: 9999px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .liquid-glass-circle::before {
+      content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.4px;
+      background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,.22) 30%,
+        rgba(255,255,255,.16) 50%, rgba(255,255,255,.22) 70%, rgba(255,255,255,.45) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+    }
+
+    .c-mw-3 { background-color: #3b1c4a; }
+    .c-mw-4 { background-color: #8a2be2; }
+    .c-mw-45 { background-color: #c2185b; }
+    .c-mw-5 { background-color: #f4511e; }
+    .c-mw-6 { background-color: #ffa726; }
+    .c-mw-7 { background-color: #ffe082; }
+    .c-mw-8 { background-color: #fffde7; }
+    .bg-mmi-8 { background-color: #ffc800; color: #000; }
+
+    .slider-track { height: 2px; background: var(--line); position: relative; border-radius: 1px; margin: 10px 0; }
+    .slider-fill { position: absolute; height: 100%; background: var(--fg); }
+    .slider-thumb { width: 12px; height: 12px; background: var(--fg); border-radius: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); }
+
+    .toggle { width: 34px; height: 20px; border-radius: 9999px; background: rgba(255,255,255,0.12); position: relative; flex-shrink: 0; }
+    .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 9999px; background: rgba(255,255,255,0.55); }
+    .toggle.on { background: #ffffff; }
+    .toggle.on::after { left: 17px; background: #000000; }
+
+    @keyframes pulse-live { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(.8); } }
+    .animate-live { animation: pulse-live 2s infinite ease-in-out; }
+    @keyframes ring-pulse { 0% { r: 16; opacity: .55; } 100% { r: 46; opacity: 0; } }
+    .ring-pulse { animation: ring-pulse 2.4s infinite ease-out; transform-box: fill-box; }
+
+    .c-d-1 { background-color: #7dd3fc; } .c-d-2 { background-color: #38bdf8; }
+    .c-d-3 { background-color: #6366f1; } .c-d-4 { background-color: #a855f7; }
+    .mmi-5 { background-color: #80ffff; } .mmi-6 { background-color: #7aff93; }
+    .mmi-7 { background-color: #ffff00; } .mmi-8 { background-color: #ffc800; }
+    .bg-chip { background: rgba(255,255,255,0.06); }
+    @keyframes wave { 0% { r: 20; opacity: .7; } 100% { r: 220; opacity: 0; } }
+    .wave { animation: wave 3s infinite ease-out; transform-box: fill-box; }
+    .wave-2 { animation-delay: 1s; } .wave-3 { animation-delay: 2s; }
+  </style>
+</head>
+<body>
+  <div class="w-full h-screen relative" style="min-height: 1080px;">
+    <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/562da62f-78e2-42c5-a41f-a573b77052ac/content-assets/mode-replay-1960/replay_1960.png" alt="Sismos de Chile entre 1906 y mayo de 1960" class="absolute inset-0 w-full h-full object-cover select-none pointer-events-none" style="z-index: 0;">
+    <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 5;" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+      <circle cx="911" cy="594" r="20" fill="none" stroke="#fffde7" stroke-width="1.5" class="wave"></circle>
+      <circle cx="911" cy="594" r="20" fill="none" stroke="#fffde7" stroke-width="1.5" class="wave wave-2"></circle>
+      <circle cx="911" cy="594" r="20" fill="none" stroke="#fffde7" stroke-width="1.5" class="wave wave-3"></circle>
+      <line x1="896" y1="606" x2="660" y2="740" stroke="rgba(255,255,255,0.45)" stroke-width="1" stroke-dasharray="3 4"></line>
+    </svg>
+    <header class="absolute top-6 left-6 right-6 flex justify-between items-center" style="z-index: 20;">
+      <div class="w-[340px]"></div>
+      <nav class="liquid-glass rounded-full px-2 py-2 flex items-center gap-1">
+        <div class="flex items-center gap-3 px-4 py-2 mr-2">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" aria-hidden="true">
+            <path d="M4.21 16.5 A9 9 0 0 1 16.5 4.21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M16.5 4.21 A9 9 0 0 1 19.79 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.4 2.3"></path>
+            <path d="M19.79 16.5 A9 9 0 0 1 4.21 16.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.01 4.7"></path>
+            <circle cx="12" cy="12" r="2.5" fill="currentColor"></circle>
+          </svg>
+          <span class="font-semibold text-sm tracking-tight">Sismos Chile</span>
+        </div>
+        <div class="w-px h-4 bg-white/10 mx-1"></div>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Explorar</button>
+        <button class="px-5 py-2 rounded-full bg-white text-black font-medium text-sm">Replay</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Placa 3D</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Anatomía</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm">Mi comuna</button>
+      </nav>
+      <div class="flex items-center gap-4 w-[340px] justify-end">
+        <div class="liquid-glass rounded-full flex items-center px-4 py-2.5 w-56">
+          <iconify-icon icon="lucide:search" class="text-fg-3 text-sm mr-2"></iconify-icon>
+          <input type="text" placeholder="Buscar comuna o ciudad…" class="bg-transparent border-none outline-none text-sm text-white w-full placeholder:text-[var(--fg-3)]">
+        </div>
+        <div class="liquid-glass rounded-full flex items-center gap-2 px-3 py-2 text-xs text-fg-2 whitespace-nowrap">
+          <div class="w-1.5 h-1.5 bg-white rounded-full animate-live"></div>
+          PostGIS en vivo
+        </div>
+      </div>
+    </header>
+    <div class="absolute left-6 top-[104px]" style="z-index: 20;">
+      <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-1">Replay · 1906–2026</div>
+      <div class="font-instrument leading-none tracking-tight" style="font-size: 200px;">1960</div>
+      <div class="font-mono text-sm text-fg-2 mt-2">22 de mayo · el tiempo avanza 1 año cada 0,6 s</div>
+      <div class="flex gap-3 mt-6">
+        <div class="liquid-glass rounded-3xl px-5 py-4">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Sismos desde 1906</div>
+          <div class="font-mono text-3xl mt-1">704</div>
+        </div>
+        <div class="liquid-glass rounded-3xl px-5 py-4">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">En 1960</div>
+          <div class="font-mono text-3xl mt-1">42</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="liquid-glass rounded-3xl px-5 py-4 absolute left-[420px] top-[700px] w-[300px]" style="z-index: 20;">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="w-2 h-2 rounded-full c-mw-8" style="box-shadow:0 0 10px 2px rgba(255,253,231,.6)"></span>
+        <span class="text-[11px] uppercase tracking-[.08em] text-fg-3">Ahora</span>
+      </div>
+      <div class="font-instrument text-4xl leading-tight">Valdivia</div>
+      <div class="font-mono text-sm mt-1">Mw 9,5 · 25 km</div>
+      <div class="text-xs text-fg-2 mt-2 leading-relaxed">El mayor terremoto registrado en el mundo. Epicentro frente a Tirúa (Biobío).</div>
+    </div>
+
+    <aside class="liquid-glass rounded-3xl p-6 w-[340px] absolute right-6 top-[104px]" style="z-index: 20;">
+      <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-3">Grandes terremotos</div>
+      <div class="flex flex-col">
+        <div class="flex items-center gap-3 py-2 text-fg-2">
+          <span class="w-4 flex justify-center"><span class="w-1.5 h-1.5 rounded-full bg-white/60"></span></span>
+          <span class="font-mono text-sm w-12">1906</span>
+          <span class="flex-1 text-sm">Valparaíso</span>
+          <span class="font-mono text-sm">Mw 8,2</span>
+        </div><div class="flex items-center gap-3 py-2 text-fg-2">
+          <span class="w-4 flex justify-center"><span class="w-1.5 h-1.5 rounded-full bg-white/60"></span></span>
+          <span class="font-mono text-sm w-12">1922</span>
+          <span class="flex-1 text-sm">Vallenar</span>
+          <span class="font-mono text-sm">Mw 8,5</span>
+        </div><div class="flex items-center gap-3 py-2 text-fg-2">
+          <span class="w-4 flex justify-center"><span class="w-1.5 h-1.5 rounded-full bg-white/60"></span></span>
+          <span class="font-mono text-sm w-12">1939</span>
+          <span class="flex-1 text-sm">Chillán</span>
+          <span class="font-mono text-sm">Mw 7,9</span>
+        </div><div class="flex items-center gap-3 py-2 text-fg-2">
+          <span class="w-4 flex justify-center"><span class="w-1.5 h-1.5 rounded-full bg-white/60"></span></span>
+          <span class="font-mono text-sm w-12">1943</span>
+          <span class="flex-1 text-sm">Illapel</span>
+          <span class="font-mono text-sm">Mw 8,1</span>
+        </div><div class="flex items-center gap-3 py-2 bg-white/10 -mx-3 px-3 rounded-2xl text-white font-medium">
+          <span class="w-4 flex justify-center"><span class="w-2.5 h-2.5 rounded-full c-mw-8" style="box-shadow:0 0 12px 3px rgba(255,253,231,.6)"></span></span>
+          <span class="font-mono text-sm w-12">1960</span>
+          <span class="flex-1 text-sm">Valdivia</span>
+          <span class="font-mono text-sm">Mw 9,5</span>
+        </div><div class="flex items-center gap-3 py-2 text-white/25">
+          <span class="w-4 flex justify-center"><span class="w-1.5 h-1.5 rounded-full border border-white/25"></span></span>
+          <span class="font-mono text-sm w-12">1985</span>
+          <span class="flex-1 text-sm">Valparaíso</span>
+          <span class="font-mono text-sm">Mw 8,0</span>
+        </div><div class="flex items-center gap-3 py-2 text-white/25">
+          <span class="w-4 flex justify-center"><span class="w-1.5 h-1.5 rounded-full border border-white/25"></span></span>
+          <span class="font-mono text-sm w-12">1995</span>
+          <span class="flex-1 text-sm">Antofagasta</span>
+          <span class="font-mono text-sm">Mw 8,0</span>
+        </div><div class="flex items-center gap-3 py-2 text-white/25">
+          <span class="w-4 flex justify-center"><span class="w-1.5 h-1.5 rounded-full border border-white/25"></span></span>
+          <span class="font-mono text-sm w-12">2010</span>
+          <span class="flex-1 text-sm">Maule</span>
+          <span class="font-mono text-sm">Mw 8,8</span>
+        </div><div class="flex items-center gap-3 py-2 text-white/25">
+          <span class="w-4 flex justify-center"><span class="w-1.5 h-1.5 rounded-full border border-white/25"></span></span>
+          <span class="font-mono text-sm w-12">2014</span>
+          <span class="flex-1 text-sm">Iquique</span>
+          <span class="font-mono text-sm">Mw 8,1</span>
+        </div><div class="flex items-center gap-3 py-2 text-white/25">
+          <span class="w-4 flex justify-center"><span class="w-1.5 h-1.5 rounded-full border border-white/25"></span></span>
+          <span class="font-mono text-sm w-12">2015</span>
+          <span class="flex-1 text-sm">Illapel</span>
+          <span class="font-mono text-sm">Mw 8,3</span>
+        </div>
+      </div>
+      <div class="border-t border-line mt-3 pt-3 text-xs text-fg-3 leading-relaxed">Los sismos recientes brillan y los antiguos se apagan. Los Mw ≥ 7 emiten una onda al aparecer.</div>
+    </aside>
+
+    <div class="absolute left-6 bottom-[132px] text-[11px] text-fg-3" style="z-index: 20;">Datos: CSN · USGS ComCat · DPA 2023 (SUBDERE/IDE Chile)</div>
+
+    <div class="liquid-glass rounded-full absolute left-6 right-6 bottom-6 h-[96px] px-4 flex items-center gap-4" style="z-index: 20;">
+      <button class="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center flex-shrink-0">
+        <iconify-icon icon="lucide:pause" class="text-2xl"></iconify-icon>
+      </button>
+      <div class="flex gap-1 flex-shrink-0">
+        <button class="px-2.5 py-1 rounded-full text-fg-2 text-xs font-mono border border-white/15">1×</button>
+        <button class="px-2.5 py-1 rounded-full text-fg-2 text-xs font-mono border border-white/15">10×</button>
+        <button class="px-2.5 py-1 rounded-full bg-white text-black text-xs font-mono">100×</button>
+      </div>
+      <div class="flex-1 relative h-[60px]">
+        <div class="absolute left-0 right-0 top-1 h-[38px] flex items-end gap-[2px]"><div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.95"></div><div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:3%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.95"></div><div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:10%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.95"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.95"></div><div class="flex-1 rounded-t-sm bg-white" style="height:5%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:4%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:6%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:7%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:8%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:10%;opacity:0.6"></div><div class="flex-1 rounded-t-sm bg-white" style="height:17%;opacity:0.95"></div><div class="flex-1 rounded-t-sm bg-white" style="height:10%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:10%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:15%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:27%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:32%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:32%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:27%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:27%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:29%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:32%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:27%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:23%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:29%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:22%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:25%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:23%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:25%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:24%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:26%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:25%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:38%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:29%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:44%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:40%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:40%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:42%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:44%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:45%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:54%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:44%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:50%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:53%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:44%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:66%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:52%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:47%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:49%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:52%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:53%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:48%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:46%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:100%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:61%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:55%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:62%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:72%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:81%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:62%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:65%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:58%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:57%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:61%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:60%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:59%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:58%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:56%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:51%;opacity:0.14"></div><div class="flex-1 rounded-t-sm bg-white" style="height:45%;opacity:0.14"></div></div>
+        <div class="absolute top-0 bottom-3 w-[2px] bg-white rounded-full" style="left:44.96%;box-shadow:0 0 10px 2px rgba(255,255,255,.5)"></div>
+        <div class="absolute left-0 right-0 bottom-0 h-3"><span class="absolute font-mono text-[10px] text-fg-3" style="left:0.00%;transform:translateX(0)">1906</span><span class="absolute font-mono text-[10px] text-fg-3" style="left:20.00%;transform:translateX(-50%)">1930</span><span class="absolute font-mono text-[10px] text-fg-3" style="left:45.00%;transform:translateX(-50%)">1960</span><span class="absolute font-mono text-[10px] text-fg-3" style="left:70.00%;transform:translateX(-50%)">1990</span><span class="absolute font-mono text-[10px] text-fg-3" style="left:100.00%;transform:translateX(-100%)">2026</span></div>
+      </div>
+      <div class="text-right pr-3 flex-shrink-0">
+        <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Reproduciendo</div>
+        <div class="font-mono text-sm">1906 → <span class="text-white">1960</span> → 2026</div>
+      </div>
+    </div>
+  </div>
+</body></html>

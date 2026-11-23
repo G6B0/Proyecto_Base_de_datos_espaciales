@@ -24,6 +24,8 @@ scripts/*
 !scripts/load_ine_manzanas_postgis.ps1
 !scripts/build_qgis_project.py
 !scripts/build_drawio_model.py
+!scripts/render_ui_basemap.py
+!scripts/render_ui_modes.py
 
 # Respaldos de QGIS y carpetas temporales de herramientas.
 *.qgs~
@@ -38,3 +40,6 @@ scripts/*
 *.tiff
 *.h5
 *.log
+
+# Archivos temporales de Superdesign.
+.superdesign/tmp/
