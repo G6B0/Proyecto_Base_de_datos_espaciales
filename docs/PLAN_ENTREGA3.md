@@ -51,7 +51,7 @@ Los análisis salen de la materia del curso (*Methods of Spatial Data Analysis*)
 
 - Los pasos 3 (Gabriel) y 5 (Ignacio) empiezan ya, en paralelo.
 - Gi\* (paso 8) usa el catálogo **sin réplicas**, así que espera a que Gabriel publique la primera ejecución de Gardner-Knopoff (meta: 26-11). Mientras tanto Ignacio puede programarlo con el catálogo completo.
-- La interfaz empieza cuando las tablas de réplicas tengan datos; el módulo de Ignacio, cuando exista el esqueleto de la aplicación (meta: 1-12).
+- El esqueleto de la interfaz ya está en `main` desde el 22-11 (antes de la meta del 1-12), así que el módulo de Ignacio puede empezar cuando tenga contornos cargados (sección 6.5).
 
 ---
 
@@ -122,7 +122,7 @@ PowerShell -ExecutionPolicy Bypass -File .\scripts\start_local_postgis.ps1
 PowerShell -ExecutionPolicy Bypass -File .\scripts\load_catalogs_postgis.ps1
 ```
 
-El descargador tarda un par de minutos y la carga unos 13 (calcula la cercanía de 31.000 sismos nuevos). Alternativa: pedirle a Gabriel el respaldo y seguir el atajo de [GUIA_ACTUALIZACION_v2.md](GUIA_ACTUALIZACION_v2.md).
+El descargador tarda un par de minutos y la carga unos 13 (calcula la cercanía de 31.000 sismos nuevos). La misma carga empareja CSN y USGS (`event_match`) y aplica la fórmula calibrada de `Mlv`, así que quedas igual que la base de Gabriel. Alternativa: pedirle a Gabriel el respaldo y seguir el atajo de [GUIA_ACTUALIZACION_v2.md](GUIA_ACTUALIZACION_v2.md).
 
 ### 6.1 Descargador de ShakeMap (paso 5)
 
@@ -165,7 +165,8 @@ Igual que el censo: `ogr2ogr` a un esquema temporal (`shakemap_staging`) y luego
 
 El borrador de la consulta está en [MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md), sección 5.3.4. La idea es sumar la población de las manzanas cuyo punto interior (`census_block.point`) cae dentro de los polígonos con `contour_value >= 6`.
 
-- Revisa primero si los polígonos de `mi.shp` son **bandas** (solo entre un valor y el siguiente) o **anidados** (cada uno contiene a los de mayor intensidad). Cambia la consulta: con bandas hay que unir todas las de valor ≥ 6, y con anidados basta el de 6.
+- **Los polígonos de `mi.shp` vienen anidados** (cada valor contiene a los de mayor intensidad; lo comprobamos con el Maule el 22-11). Por eso basta el polígono de `contour_value = 6`; unir todos los ≥ 6 da lo mismo, pero es más lento.
+- **Valor para comprobar tu consulta:** con el ShakeMap preferido del Maule 2010 (`shakemap[0]`, versión `atlas`), las manzanas del Censo 2024 cuyo punto interior cae en MMI ≥ VI suman **12.813.134 personas** (12,8 millones, el 79 % de la población en manzanas). Se calculó en Python en `scripts/render_ui_modes.py` (función `render_maule`); tu consulta en SQL debería dar lo mismo o diferir muy poco (puntos justo en el borde). Si tu ShakeMap es de otra versión, la cifra puede cambiar.
 - Compara el resultado con los anillos de 25, 50 y 100 km que ya tenemos (`event_population_exposure`): es el análisis central de tu parte. La materia lo dice así: muchos eventos no es lo mismo que mucha población en riesgo.
 - Escribe la consulta como **consulta 20** en `db/queries.sql`.
 
@@ -183,10 +184,12 @@ Diapositivas 34 a 44 de la materia. Responde **dónde se concentra la sismicidad
 
 ### 6.5 Módulo de intensidad de la interfaz (paso 9)
 
-Cuando Gabriel publique el esqueleto (meta: 1-12):
+El esqueleto ya está en `main` (22-11). Para correrlo, con la base encendida: `PowerShell -ExecutionPolicy Bypass -File .\app\run.ps1` y abrir http://127.0.0.1:8000. La arquitectura está en [INTERFAZ.md](INTERFAZ.md).
 
-- **Backend** (`app/api/routes/intensity.py`): un endpoint que devuelve los contornos de un sismo y su población expuesta a MMI ≥ VI, y otro con los hexágonos de Gi\*.
-- **Frontend** (`app/web/js/intensity.js`): al elegir un sismo con ShakeMap, dibujar sus contornos coloreados por MMI y mostrar la población expuesta; una capa activable con las zonas calientes.
+- **Backend** (`app/api/routes/intensity.py`): un endpoint que devuelve los contornos de un sismo y su población expuesta a MMI ≥ VI, y otro con los hexágonos de Gi\*. Sigue el modelo de `app/api/routes/events.py`: `router = APIRouter()` y las consultas con `fetch_one` / `fetch_all` de `app/api/db.py`, siempre con parámetros (`%(nombre)s`), nunca con texto pegado.
+- **Registrar la ruta:** `app/api/main.py` es de Gabriel. Cuando exista tu `intensity.py`, avísale y él agrega la línea `app.include_router(intensity.router)`.
+- **Frontend** (`app/web/js/intensity.js`): al elegir un sismo con ShakeMap, dibujar sus contornos coloreados por MMI y mostrar la población expuesta; una capa activable con las zonas calientes. Las capas se agregan al mapa de MapLibre igual que en `app/web/js/map.js` (una fuente GeoJSON más capas `fill` y `line`).
+- **Cómo debe verse:** la pantalla de Anatomía del diseño (`docs/design/04_anatomia.html`) y los colores oficiales MMI del sistema de diseño (`.superdesign/design-system.md`, sección 3.2). `scripts/render_ui_modes.py` ya dibuja los contornos del Maule con esos colores; sirve de referencia.
 
 ### 6.6 Mapas, informe y presentación (paso 10)
 
