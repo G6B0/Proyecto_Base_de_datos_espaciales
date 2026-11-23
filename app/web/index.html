@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sismos Chile · Observatorio</title>
+  <!-- Librerías locales (vendor/) para que la demo funcione sin internet. -->
+  <script src="/vendor/tailwindcss-3.4.1.js"></script>
+  <link rel="stylesheet" href="/vendor/maplibre-gl.css">
+  <script src="/vendor/maplibre-gl.js"></script>
+  <!-- Pendiente para el ensayo sin internet: tipografías e íconos locales. -->
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/observatorio.css">
+</head>
+<body>
+  <div class="w-full h-screen relative">
+
+    <!-- Mapa vivo: tierra y regiones desde PostGIS, sismos por teselas vectoriales (ST_AsMVT). -->
+    <div id="map"></div>
+
+    <!-- BARRA SUPERIOR -->
+    <header class="absolute top-6 left-6 right-6 flex justify-between items-center pointer-events-none" style="z-index: 20;">
+      <div class="w-[340px]"></div>
+      <nav class="liquid-glass rounded-full px-2 py-2 flex items-center gap-1 pointer-events-auto">
+        <div class="flex items-center gap-3 px-4 py-2 mr-2">
+          <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5" aria-hidden="true">
+            <path d="M4.21 16.5 A9 9 0 0 1 16.5 4.21" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M16.5 4.21 A9 9 0 0 1 19.79 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="2.4 2.3"></path>
+            <path d="M19.79 16.5 A9 9 0 0 1 4.21 16.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.01 4.7"></path>
+            <circle cx="12" cy="12" r="2.5" fill="currentColor"></circle>
+          </svg>
+          <span class="font-semibold text-sm tracking-tight">Sismos Chile</span>
+        </div>
+        <div class="w-px h-4 bg-white/10 mx-1"></div>
+        <button class="px-5 py-2 rounded-full bg-white text-black text-sm font-medium" data-mode="explorar">Explorar</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="replay" title="Próximamente">Replay</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="placa3d" title="Próximamente">Placa 3D</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="anatomia" title="Próximamente">Anatomía</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="micomuna" title="Próximamente">Mi comuna</button>
+      </nav>
+      <div class="flex items-center gap-4 w-[340px] justify-end pointer-events-auto">
+        <div class="liquid-glass rounded-full flex items-center px-4 py-2.5 w-56">
+          <iconify-icon icon="lucide:search" class="text-fg-3 text-sm mr-2"></iconify-icon>
+          <input type="text" placeholder="Buscar comuna o ciudad…" class="bg-transparent border-none outline-none text-sm text-white w-full placeholder:text-[var(--fg-3)]">
+        </div>
+        <div class="liquid-glass rounded-full flex items-center gap-2 px-3 py-2 text-xs text-fg-2 whitespace-nowrap" id="live-chip">
+          <div class="w-1.5 h-1.5 bg-white rounded-full animate-live" id="live-dot"></div>
+          <span id="live-text">PostGIS en vivo</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- PANEL IZQUIERDO: FILTROS -->
+    <aside class="liquid-glass rounded-3xl p-6 w-[340px] flex flex-col gap-6 absolute left-6 top-[104px]" style="z-index: 20;">
+      <div>
+        <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-2">Filtros</div>
+        <div class="font-instrument text-7xl tracking-tight leading-none" id="count-unique">—</div>
+        <div class="font-mono text-xs text-fg-2 uppercase tracking-widest mt-2">Sismos únicos · <span id="count-years">—</span></div>
+        <div class="font-mono text-[11px] text-fg-3 mt-1"><span id="count-records">—</span> registros · <span id="count-pairs">—</span> pares CSN–USGS</div>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Años</span>
+          <span class="font-mono text-sm">1906 – 2026</span>
+        </div>
+        <div class="slider-track"><div class="slider-fill" style="left: 0; right: 0;"></div><div class="slider-thumb" style="left: 0"></div><div class="slider-thumb" style="left: 100%"></div></div>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Magnitud (Mw)</span>
+          <span class="font-mono text-sm">todas</span>
+        </div>
+        <div class="slider-track"><div class="slider-fill" style="left: 0; right: 0;"></div><div class="slider-thumb" style="left: 0"></div></div>
+        <div class="flex mt-3 h-1.5 rounded-full overflow-hidden">
+          <div class="flex-1 c-mw-3"></div><div class="flex-1 c-mw-4"></div><div class="flex-1 c-mw-45"></div>
+          <div class="flex-1 c-mw-5"></div><div class="flex-1 c-mw-6"></div><div class="flex-1 c-mw-7"></div><div class="flex-1 c-mw-8"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-3">
+          <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Profundidad</span>
+          <span class="font-mono text-sm">0 – 700 km</span>
+        </div>
+        <div class="slider-track"><div class="slider-fill" style="left: 0; right: 0;"></div><div class="slider-thumb" style="left: 0"></div><div class="slider-thumb" style="left: 100%"></div></div>
+      </div>
+
+      <div class="border-t border-line pt-5">
+        <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-2">Región</div>
+        <button class="w-full flex justify-between items-center py-1 text-sm text-fg-2 hover:text-white">
+          <span>Todas las regiones</span><iconify-icon icon="lucide:chevron-down"></iconify-icon>
+        </button>
+      </div>
+
+      <div class="border-t border-line pt-5">
+        <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-3">Fuente</div>
+        <div class="flex gap-2">
+          <button class="flex-1 py-1.5 rounded-full bg-white text-black text-xs font-medium">Ambas</button>
+          <button class="flex-1 py-1.5 rounded-full text-fg-2 text-xs border border-white/15">CSN</button>
+          <button class="flex-1 py-1.5 rounded-full text-fg-2 text-xs border border-white/15">USGS</button>
+        </div>
+      </div>
+
+      <div class="border-t border-line pt-5 flex flex-col gap-3 text-sm">
+        <label class="flex items-center justify-between gap-3"><span class="text-fg-2">Ocultar réplicas</span><span class="toggle"></span></label>
+        <label class="flex items-center justify-between gap-3"><span class="text-fg-2">Zonas calientes (Gi*)</span><span class="toggle"></span></label>
+      </div>
+    </aside>
+
+    <!-- PANEL DERECHO: SISMO SELECCIONADO -->
+    <aside class="liquid-glass rounded-3xl p-6 w-[340px] absolute right-6 top-[104px]" style="z-index: 20;" id="detail">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="w-2 h-2 rounded-full bg-white"></span>
+        <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Sismo seleccionado</span>
+      </div>
+      <h2 class="font-instrument text-[56px] leading-none tracking-tight" id="d-title">—</h2>
+      <div class="font-mono text-xs text-fg-2 mt-2" id="d-date">Haz clic en un sismo del mapa</div>
+
+      <div class="grid grid-cols-3 gap-2 mt-5 mb-5">
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Mw</div>
+          <div class="font-mono text-2xl mt-0.5" id="d-mw">—</div>
+        </div>
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Prof.</div>
+          <div class="font-mono text-2xl mt-0.5"><span id="d-depth">—</span><span class="text-sm text-fg-3"> km</span></div>
+        </div>
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">MMI máx</div>
+          <div class="flex items-center gap-1.5 mt-0.5"><span class="font-mono text-2xl" id="d-mmi">—</span><span class="px-1.5 py-0.5 rounded text-[10px] font-bold hidden" id="d-mmi-chip"></span></div>
+        </div>
+      </div>
+
+      <div class="flex flex-col text-sm">
+        <div class="flex justify-between gap-4 border-b border-line py-2.5">
+          <span class="text-fg-3">Comuna</span>
+          <span class="text-right"><span id="d-commune">—</span><br><span class="font-mono text-xs text-fg-3" id="d-commune-km"></span></span>
+        </div>
+        <div class="flex justify-between gap-4 border-b border-line py-2.5">
+          <span class="text-fg-3">Zona urbana más cercana</span>
+          <span class="text-right"><span id="d-urban">—</span><br><span class="font-mono text-xs text-fg-3" id="d-urban-km"></span></span>
+        </div>
+        <div class="border-b border-line py-2.5">
+          <div class="text-fg-3 mb-2">Población a 25 · 50 · 100 km</div>
+          <div class="grid grid-cols-3 font-mono"><span id="d-pop25">—</span><span id="d-pop50">—</span><span id="d-pop100">—</span></div>
+        </div>
+        <div class="flex justify-between gap-4 border-b border-line py-2.5">
+          <span class="text-fg-3">Magnitud publicada</span>
+          <span class="text-right font-mono" id="d-published">—</span>
+        </div>
+        <div class="flex justify-between gap-4 border-b border-line py-2.5">
+          <span class="text-fg-3">Papel en la secuencia</span>
+          <span class="text-right" id="d-role">—</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 mt-4" id="d-chips"></div>
+      <button class="w-full mt-4 bg-white text-black rounded-full py-3 text-sm font-medium opacity-40 cursor-not-allowed" title="Próximamente: modo Anatomía">Ver anatomía del terremoto →</button>
+    </aside>
+
+    <!-- LEYENDA -->
+    <div class="liquid-glass rounded-3xl px-5 py-4 absolute right-[88px] bottom-[128px]" style="z-index: 20;">
+      <div class="text-[11px] uppercase tracking-[.08em] text-fg-3 mb-3">Magnitud (Mw)</div>
+      <div class="flex items-end gap-4">
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-4" style="width:4px;height:4px;"></span><span class="font-mono text-[11px] text-fg-2">4</span></div>
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-5" style="width:6px;height:6px;"></span><span class="font-mono text-[11px] text-fg-2">5</span></div>
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-6" style="width:9px;height:9px;"></span><span class="font-mono text-[11px] text-fg-2">6</span></div>
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-7" style="width:13px;height:13px;"></span><span class="font-mono text-[11px] text-fg-2">7</span></div>
+        <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-8" style="width:18px;height:18px;box-shadow:0 0 14px 3px rgba(255,253,231,.45);"></span><span class="font-mono text-[11px] text-fg-2">8+</span></div>
+      </div>
+    </div>
+
+    <div class="absolute left-6 bottom-[132px] text-[11px] text-fg-3" style="z-index: 20;">
+      Datos: CSN · USGS ComCat · DPA 2023 (SUBDERE/IDE Chile) · Censo 2024 (INE)
+    </div>
+
+    <!-- LINEA DE TIEMPO: sismos Mw >= 4 por año (datos reales) -->
+    <div class="liquid-glass rounded-full absolute left-6 right-[88px] bottom-6 h-[88px] px-4 flex items-center gap-4" style="z-index: 20;">
+      <button class="liquid-glass-circle w-14 h-14 text-white flex-shrink-0" title="Próximamente: modo Replay">
+        <iconify-icon icon="lucide:play" class="text-xl ml-0.5"></iconify-icon>
+      </button>
+      <div class="flex gap-1 flex-shrink-0">
+        <button class="px-2.5 py-1 rounded-full bg-white text-black text-xs font-mono">1×</button>
+        <button class="px-2.5 py-1 rounded-full text-fg-2 text-xs font-mono border border-white/15">10×</button>
+        <button class="px-2.5 py-1 rounded-full text-fg-2 text-xs font-mono border border-white/15">100×</button>
+      </div>
+      <div class="flex-1 relative h-[60px]">
+        <div class="absolute left-0 right-0 top-1 h-[38px] flex items-end gap-[2px]" id="histogram"></div>
+        <div class="absolute left-0 right-0 bottom-0 h-3" id="histogram-ticks"></div>
+      </div>
+      <div class="text-right pr-3 flex-shrink-0">
+        <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Rango</div>
+        <div class="font-mono text-sm" id="histogram-range">—</div>
+      </div>
+    </div>
+
+    <!-- CONTROLES DEL MAPA -->
+    <div class="absolute right-6 bottom-6 flex flex-col gap-2" style="z-index: 20;">
+      <button class="liquid-glass-circle w-12 h-12 text-white" id="btn-zoom-in" title="Acercar"><iconify-icon icon="lucide:plus"></iconify-icon></button>
+      <button class="liquid-glass-circle w-12 h-12 text-white" id="btn-zoom-out" title="Alejar"><iconify-icon icon="lucide:minus"></iconify-icon></button>
+      <button class="liquid-glass-circle w-12 h-12 text-white" id="btn-home" title="Ver todo Chile"><iconify-icon icon="lucide:locate"></iconify-icon></button>
+    </div>
+  </div>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

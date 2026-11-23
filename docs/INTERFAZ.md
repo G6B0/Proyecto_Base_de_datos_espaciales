@@ -90,13 +90,13 @@ app/
   requirements.txt        fastapi, uvicorn, psycopg[binary]
 ```
 
-Para correrla:
+Para correrla (con la base encendida):
 
 ```powershell
-py -3 -m venv app\.venv
-app\.venv\Scripts\pip install -r app\requirements.txt
-app\.venv\Scripts\uvicorn app.api.main:app --host 127.0.0.1 --port 8000
+PowerShell -ExecutionPolicy Bypass -File .\app\run.ps1
 ```
+
+La primera vez crea `app\.venv` e instala `app\requirements.txt`; después abre http://127.0.0.1:8000.
 
 ---
 
@@ -104,7 +104,7 @@ app\.venv\Scripts\uvicorn app.api.main:app --host 127.0.0.1 --port 8000
 
 Cada paso deja algo que se ve en el navegador:
 
-1. **Esqueleto** (27–30 nov): FastAPI sirviendo `index.html` con la cáscara del diseño; mapa con tierra y regiones desde la base; los sismos por teselas vectoriales con la rampa de colores. Ya se ve "Explorar".
+1. **Esqueleto** (hecho el 22-11): FastAPI sirviendo `index.html` con la cáscara del diseño; mapa con tierra y regiones desde la base; los sismos por teselas vectoriales con la rampa de colores. Ya se ve "Explorar".
 2. **Explorar completo** (1–2 dic): filtros conectados, ficha del sismo al hacer clic, histograma real.
 3. **Replay** (2–3 dic): animación 1906–2026.
 4. **Anatomía** (3–4 dic): cuando las tablas de réplicas tengan datos; los contornos MMI cuando Ignacio cargue `shakemap_contour`.
