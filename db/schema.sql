@@ -320,7 +320,9 @@ VALUES
     ('csn_relation_ml', 0.9575, 0.2412, 4.0, 5.4, false,
      'Relacion usada por el CSN para ML de la U. de Chile: 4.602 eventos 2001-2025. Validada para el Ml diario: es el mismo ML (77 de 84 identicos) y el residuo contra MWconv es +0,008 +/- 0,145 (315 pares).'),
     ('csn_relation_mlv_provisional', 0.9575, 0.2412, 4.0, 5.4, true,
-     'Misma relacion aplicada a Mlv/Mlh, que el CSN usa desde 2026. Contra mb de USGS convertido el residuo es -0,035 +/- 0,20 (147 pares), pero contra mwr sugiere que Mlv queda ~0,1 alto. Provisional.')
+     'Misma relacion aplicada a Mlv/Mlh, que el CSN usa desde 2026. Contra mb de USGS convertido el residuo es -0,035 +/- 0,20 (147 pares), pero contra mwr sugiere que Mlv queda ~0,1 alto. Provisional. Desde el 2026-11-22 solo la usa Mlh (4 eventos, sin pares para calibrar); Mlv usa csn_relation_mlv_calibrated.'),
+    ('csn_relation_mlv_calibrated', 0.9575, 0.1512, 4.0, 5.4, false,
+     'Calibrada el 2026-11-22 con los pares de event_match: Mlv queda 0,09 +/- 0,02 sobre Ml. Se compararon Mlv y Ml (formula validada) contra la misma referencia USGS: Mw de momento (36 y 27 pares, diferencia +0,17 +/- 0,04) y Mw homogeneo (266 y 300 pares, +0,08 +/- 0,02); promedio ponderado por precision. Es la relacion de Ml con el intercepto bajado en 0,09, para quedar en la escala MWconv del CSN.')
 ON CONFLICT (conversion_method) DO UPDATE SET
     slope = EXCLUDED.slope,
     intercept = EXCLUDED.intercept,
@@ -349,7 +351,7 @@ VALUES
     ('csn', 'mww', 'native'),
     ('csn', 'mb', 'csn_relation_mb_neic'),
     ('csn', 'ml', 'csn_relation_ml'),
-    ('csn', 'mlv', 'csn_relation_mlv_provisional'),
+    ('csn', 'mlv', 'csn_relation_mlv_calibrated'),
     ('csn', 'mlh', 'csn_relation_mlv_provisional'),
     ('usgs', 'mw', 'native'),
     ('usgs', 'mww', 'native'),
@@ -750,7 +752,7 @@ CREATE INDEX IF NOT EXISTS shakemap_contour_geom_gix
 COMMENT ON TABLE seismic.magnitude_estimate IS
     'Todas las magnitudes publicadas de cada evento (1:N): la original (reported) y la convertida por la fuente (converted). La preferida queda marcada con is_preferred.';
 COMMENT ON TABLE seismic.event_match IS
-    'Pares CSN-USGS que corresponden al mismo sismo. Se llena en la entrega 3 (regla propuesta: menos de 60 s y 100 km).';
+    'Pares CSN-USGS que corresponden al mismo sismo. Lo llena db/match_events.sql: candidatos a 60 s y 100 km o menos, asignacion voraz uno a uno por puntaje.';
 COMMENT ON TABLE seismic.declustering_run IS
     'Una ejecucion de un metodo de declustering (Gardner-Knopoff, Reasenberg, Zaliapin) con sus parametros. Se llena en la entrega 3.';
 COMMENT ON TABLE seismic.seismic_sequence IS
@@ -761,3 +763,23 @@ COMMENT ON TABLE seismic.event_impact_summary IS
     'Intensidad maxima (MMI, CDI) y alerta PAGER publicadas por USGS. Se llena en la entrega 3.';
 COMMENT ON TABLE seismic.shakemap_contour IS
     'Contornos de intensidad ShakeMap de USGS como MultiPolygon. Se llena en la entrega 3.';
+
+-- Un registro por sismo: todos los del CSN (fuente principal) y los de USGS
+-- que no tienen par en event_match (db/match_events.sql). Sirve para contar
+-- sin duplicados cuando se mezclan fuentes. Mismas columnas que
+-- v_event_location, mas also_in_usgs: el registro CSN tiene copia en USGS.
+CREATE OR REPLACE VIEW seismic.v_event_location_unique AS
+SELECT
+    location.*,
+    EXISTS (
+        SELECT 1 FROM seismic.event_match AS pair
+        WHERE pair.csn_event_id = location.earthquake_event_id
+    ) AS also_in_usgs
+FROM seismic.v_event_location AS location
+WHERE NOT EXISTS (
+    SELECT 1 FROM seismic.event_match AS pair
+    WHERE pair.usgs_event_id = location.earthquake_event_id
+);
+
+COMMENT ON VIEW seismic.v_event_location_unique IS
+    'Un registro por sismo: CSN completo mas los sismos USGS sin par en event_match.';

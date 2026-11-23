@@ -134,6 +134,14 @@ try {
         throw 'El registro de magnitudes por evento fallo; los eventos cargados se conservan.'
     }
 
+    # Emparejamiento CSN-USGS: que registros son el mismo sismo (segundos).
+    Write-Host 'Emparejando CSN y USGS (db/match_events.sql)'
+    & $psql -h 127.0.0.1 -p $databasePort -U $databaseUser -d $databaseName `
+        -v ON_ERROR_STOP=1 -f (Join-Path $projectRoot 'db\match_events.sql')
+    if ($LASTEXITCODE -ne 0) {
+        throw 'El emparejamiento CSN-USGS fallo; los eventos cargados se conservan.'
+    }
+
     # Si la DPA ya esta cargada, se recalcula la comuna de cada evento para
     # incluir los sismos nuevos o con ubicacion revisada.
     $communeParts = & $psql -h 127.0.0.1 -p $databasePort -U $databaseUser -d $databaseName `
