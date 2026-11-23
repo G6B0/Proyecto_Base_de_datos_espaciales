@@ -2,7 +2,7 @@
 
 **Equipo:** Gabriel Huerta, Ignacio Barría
 **Fecha del plan:** 2026-11-22
-**Entrega final:** 07-12-2026 (Control 3: 30-11-2026)
+**Entrega final:** informe el 10-12-2026 y presentación en el laboratorio del 11-12-2026 (Control 3: 30-11-2026)
 
 Este plan reparte el trabajo de la entrega 3 entre los dos. Gabriel lleva el camino crítico (catálogo USGS, emparejamiento y réplicas) e Ignacio un bloque casi independiente (intensidad ShakeMap, población expuesta y mapas finales). Lo que se prometió en la presentación del Hito 2 está en [MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md), sección 11.
 
@@ -43,7 +43,7 @@ Las siete tablas ya existen en la base (Hito 2). No hay que cambiar el esquema; 
 | 22–25 nov | 1. Descargador y carga del USGS completo; `event_impact_summary`. Respaldo de la base para Ignacio. | 4. Prototipo del descargador de ShakeMap con Maule 2010 e Illapel 2015. |
 | 25–28 nov | 2. `event_match`; calibrar `Mlv` con los pares. | 4–5. Descarga de los 1.165 ShakeMap; carga en `shakemap_contour`. |
 | 28 nov – 2 dic | 3. Gardner-Knopoff sobre USGS M ≥ 4; Omori y Båth. | 6. Población expuesta a MMI ≥ VI; primeros mapas QGIS. |
-| 3–7 dic | 7. Informe final e integración. | 7. Mapas finales, sus secciones del informe y la presentación. |
+| 3–10 dic | 7. Informe final (entrega el 10-12) e integración. | 7. Mapas finales, sus secciones del informe y la presentación (11-12). |
 
 ---
 
@@ -144,8 +144,8 @@ El borrador de la consulta está en [MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md), 
 
 | Paso | Estado |
 |---|---|
-| 1. USGS completo + `event_impact_summary` | En curso (Gabriel) |
-| 2. `event_match` + `Mlv` | Pendiente |
+| 1. USGS completo + `event_impact_summary` | **Hecho** (22-11): 31.007 sismos USGS; 5.321 resúmenes de impacto (1.165 con ShakeMap) |
+| 2. `event_match` + `Mlv` | **Hecho** (22-11): 29.219 pares; vista `v_event_location_unique` (61.133 sismos únicos); `Mlv` calibrada (−0,09); consultas 16 a 19 |
 | 3. Réplicas | Pendiente (borrador probado sobre el CSN) |
 | 4. Descargador de ShakeMap | Pendiente (Ignacio) |
 | 5. Carga de contornos | Pendiente |

@@ -20,7 +20,7 @@
 6. **Estado [IMPLEMENTADO]:** con los datos al 11-11-2026, 45.835 de 59.534 eventos (77 %) tienen `mw_homogenized`. Esto incluye casi todos los que tienen M ≥ 4. Los que quedan sin Mw son sismos chicos de las páginas diarias, que conservan su `Ml` original.
 7. **Validación (sección 10):**
    - **La fórmula para `Ml` quedó validada.** El `Ml` de las páginas diarias es el mismo `ML` que el CSN convertía, y la fórmula reproduce su Mw con un error medio de +0,008.
-   - **`Mlv` sigue provisional.** Es coherente en promedio, pero hay indicios de que da ~0,1 más alto.
+   - **`Mlv` quedó calibrada el 2026-11-22** con los pares CSN–USGS de `event_match`: da 0,09 ± 0,02 más que `Ml`, así que su fórmula es la de `Ml` con el intercepto bajado en 0,09 (`csn_relation_mlv_calibrated`: Mw = 0,9575·Mlv + 0,1512). Con ella, la diferencia media contra el Mw homogéneo de USGS pasó de +0,09 a 0,00 en 210 pares (consulta 18). `Mlh` (4 eventos, sin pares) sigue con la fórmula provisional.
 
 ---
 
