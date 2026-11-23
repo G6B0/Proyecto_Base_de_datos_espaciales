@@ -43,3 +43,6 @@ scripts/*
 
 # Archivos temporales de Superdesign.
 .superdesign/tmp/
+
+# Entorno de Python de la interfaz.
+app/.venv/
