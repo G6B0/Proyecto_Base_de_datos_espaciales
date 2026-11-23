@@ -1,6 +1,12 @@
+# Carga los catalogos CSN y USGS en la base.
+#   -CsnCsv  : CSV del CSN (por defecto data\processed\csn\csn_earthquake_catalog.csv).
+#   -UsgsCsv : uno o varios CSV de USGS. Por defecto TODOS los
+#              data\processed\usgs\usgs_earthquakes_chile*.csv (la muestra
+#              reciente M>=2,5 y el catalogo completo M>=4 desde 1900). Si un
+#              sismo esta en varios, se conserva su version mas nueva.
 param(
     [string]$CsnCsv,
-    [string]$UsgsCsv
+    [string[]]$UsgsCsv
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,26 +42,44 @@ if (-not $CsnCsv) {
     $CsnCsv = Join-Path $projectRoot 'data\processed\csn\csn_earthquake_catalog.csv'
 }
 if (-not $UsgsCsv) {
-    $latestUsgs = Get-ChildItem `
+    $UsgsCsv = @(Get-ChildItem `
         -Path (Join-Path $projectRoot 'data\processed\usgs') `
         -Filter 'usgs_earthquakes_chile*.csv' `
         -File `
         -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTimeUtc -Descending |
-        Select-Object -First 1
-    if (-not $latestUsgs) {
+        Sort-Object Name |
+        ForEach-Object { $_.FullName })
+    if ($UsgsCsv.Count -eq 0) {
         throw 'No se encontro un CSV procesado de USGS. Ejecuta primero el descargador.'
     }
-    $UsgsCsv = $latestUsgs.FullName
 }
 
 $CsnCsv = [System.IO.Path]::GetFullPath($CsnCsv)
-$UsgsCsv = [System.IO.Path]::GetFullPath($UsgsCsv)
 if (-not (Test-Path -LiteralPath $CsnCsv)) {
     throw "No se encontro el CSV del CSN: $CsnCsv"
 }
-if (-not (Test-Path -LiteralPath $UsgsCsv)) {
-    throw "No se encontro el CSV de USGS: $UsgsCsv"
+
+# Una linea \copy por CSV de USGS. La lista de columnas sale del encabezado:
+# asi los CSV anteriores a la entrega 3 (sin mmi, cdi, alert, product_types
+# ni detail_url) se cargan igual, con esas columnas en NULL.
+$usgsCopyLines = @()
+$usgsFiles = @()
+foreach ($path in $UsgsCsv) {
+    $fullPath = [System.IO.Path]::GetFullPath($path)
+    if (-not (Test-Path -LiteralPath $fullPath)) {
+        throw "No se encontro el CSV de USGS: $fullPath"
+    }
+    $header = (Get-Content -LiteralPath $fullPath -TotalCount 1 -Encoding UTF8).TrimStart([char]0xFEFF)
+    $columns = $header.Split(',') | ForEach-Object { $_.Trim() }
+    foreach ($column in $columns) {
+        if ($column -notmatch '^[a-z_]+$') {
+            throw "Columna inesperada '$column' en $fullPath"
+        }
+    }
+    $escapedPath = $fullPath.Replace('\', '/').Replace("'", "''")
+    $usgsCopyLines += "\copy import_usgs ($($columns -join ', ')) FROM '$escapedPath' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')"
+    $usgsFiles += $escapedPath
+    Write-Host "USGS: $fullPath"
 }
 
 $databaseName = Get-ProjectEnvValue -Name 'POSTGRES_DB'
@@ -75,9 +99,9 @@ try {
     $env:PGPASSWORD = $databasePassword
     $sql = Get-Content -LiteralPath $sqlPath -Raw
     $escapedCsnPath = $CsnCsv.Replace('\', '/').Replace("'", "''")
-    $escapedUsgsPath = $UsgsCsv.Replace('\', '/').Replace("'", "''")
     $sql = $sql.Replace('__CSN_CSV__', $escapedCsnPath)
-    $sql = $sql.Replace('__USGS_CSV__', $escapedUsgsPath)
+    $sql = $sql.Replace('__USGS_COPY__', ($usgsCopyLines -join "`n"))
+    $sql = $sql.Replace('__USGS_CSV__', ($usgsFiles -join '; '))
     [System.IO.File]::WriteAllText(
         $temporarySql,
         $sql,

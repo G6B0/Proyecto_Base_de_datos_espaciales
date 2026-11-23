@@ -54,10 +54,33 @@ CREATE TEMP TABLE import_usgs (
     location_source text,
     magnitude_source text,
     event_type text,
-    source_url text
+    source_url text,
+    -- Resumen de impacto publicado por USGS. Los CSV anteriores a la
+    -- entrega 3 no traen estas columnas y quedan en NULL.
+    mmi numeric,
+    cdi numeric,
+    alert text,
+    product_types text,
+    detail_url text
 );
 
-\copy import_usgs FROM '__USGS_CSV__' WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')
+-- Una linea \copy por cada CSV de USGS, con la lista de columnas de su
+-- encabezado (la genera scripts/load_catalogs_postgis.ps1).
+__USGS_COPY__
+
+-- La muestra reciente y el catalogo completo se solapan: se conserva la
+-- version mas nueva de cada sismo para no actualizar dos veces la misma fila.
+DELETE FROM import_usgs AS older
+USING import_usgs AS newer
+WHERE older.source_event_id = newer.source_event_id
+  AND (
+      coalesce(older.updated_at_utc, '-infinity') < coalesce(newer.updated_at_utc, '-infinity')
+      OR (older.updated_at_utc IS NOT DISTINCT FROM newer.updated_at_utc
+          AND (older.product_types IS NULL) > (newer.product_types IS NULL))
+      OR (older.updated_at_utc IS NOT DISTINCT FROM newer.updated_at_utc
+          AND (older.product_types IS NULL) = (newer.product_types IS NULL)
+          AND older.ctid < newer.ctid)
+  );
 
 CREATE TEMP TABLE existing_csn AS
 SELECT staged.source_event_id
@@ -248,7 +271,12 @@ SELECT
         'network', network,
         'location_source', location_source,
         'magnitude_source', magnitude_source,
-        'source_url', source_url
+        'source_url', source_url,
+        'mmi', mmi,
+        'cdi', cdi,
+        'alert', alert,
+        'product_types', product_types,
+        'detail_url', detail_url
     ))
 FROM import_usgs
 ON CONFLICT (source_code, source_event_id) DO UPDATE SET
@@ -277,6 +305,56 @@ ON CONFLICT (source_code, source_event_id) DO UPDATE SET
     geom = EXCLUDED.geom,
     raw_data = EXCLUDED.raw_data,
     last_seen_at = now();
+
+-- Resumen de impacto USGS (intensidad maxima, alerta PAGER y productos).
+-- Solo para filas que vienen de un CSV con estas columnas: en ellos
+-- product_types nunca es NULL, porque todo sismo trae al menos 'origin'.
+-- MMI y CDI fuera de 1..12 (USGS publica algunos 0) se guardan como NULL.
+CREATE TEMP TABLE usgs_impact AS
+SELECT
+    event.earthquake_event_id,
+    CASE WHEN staged.mmi BETWEEN 1 AND 12 THEN round(staged.mmi, 1) END AS max_mmi,
+    CASE WHEN staged.cdi BETWEEN 1 AND 12 THEN round(staged.cdi, 1) END AS max_cdi,
+    CASE WHEN lower(staged.alert) IN ('green', 'yellow', 'orange', 'red')
+         THEN lower(staged.alert) END AS pager_alert,
+    'shakemap' = ANY (string_to_array(staged.product_types, ',')) AS has_shakemap,
+    'dyfi' = ANY (string_to_array(staged.product_types, ',')) AS has_dyfi,
+    'losspager' = ANY (string_to_array(staged.product_types, ',')) AS has_losspager,
+    staged.detail_url
+FROM import_usgs AS staged
+JOIN seismic.earthquake_event AS event
+  ON event.source_code = 'usgs'
+ AND event.source_event_id = staged.source_event_id
+WHERE staged.product_types IS NOT NULL;
+
+INSERT INTO seismic.event_impact_summary (
+    earthquake_event_id, max_mmi, max_cdi, pager_alert,
+    has_shakemap, has_dyfi, has_losspager, detail_url, retrieved_at
+)
+SELECT
+    earthquake_event_id, max_mmi, max_cdi, pager_alert,
+    has_shakemap, has_dyfi, has_losspager, detail_url, now()
+FROM usgs_impact
+WHERE max_mmi IS NOT NULL OR max_cdi IS NOT NULL OR pager_alert IS NOT NULL
+   OR has_shakemap OR has_dyfi OR has_losspager
+ON CONFLICT (earthquake_event_id) DO UPDATE SET
+    max_mmi = EXCLUDED.max_mmi,
+    max_cdi = EXCLUDED.max_cdi,
+    pager_alert = EXCLUDED.pager_alert,
+    has_shakemap = EXCLUDED.has_shakemap,
+    has_dyfi = EXCLUDED.has_dyfi,
+    has_losspager = EXCLUDED.has_losspager,
+    detail_url = EXCLUDED.detail_url,
+    retrieved_at = EXCLUDED.retrieved_at;
+
+-- Un sismo que USGS ya no publica con productos de impacto pierde su fila.
+DELETE FROM seismic.event_impact_summary AS impact
+USING usgs_impact
+WHERE impact.earthquake_event_id = usgs_impact.earthquake_event_id
+  AND usgs_impact.max_mmi IS NULL
+  AND usgs_impact.max_cdi IS NULL
+  AND usgs_impact.pager_alert IS NULL
+  AND NOT (usgs_impact.has_shakemap OR usgs_impact.has_dyfi OR usgs_impact.has_losspager);
 
 UPDATE seismic.ingestion_run
 SET
@@ -320,3 +398,11 @@ SELECT
 FROM seismic.ingestion_run
 ORDER BY ingestion_run_id DESC
 LIMIT 2;
+
+SELECT
+    count(*) AS usgs_events_with_impact,
+    count(*) FILTER (WHERE has_shakemap) AS with_shakemap,
+    count(*) FILTER (WHERE has_dyfi) AS with_dyfi,
+    count(*) FILTER (WHERE pager_alert IS NOT NULL) AS with_pager_alert,
+    max(max_mmi) AS highest_mmi
+FROM seismic.event_impact_summary;
