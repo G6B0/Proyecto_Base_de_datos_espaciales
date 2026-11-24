@@ -1,0 +1,324 @@
+{
+ "metodo": "Test de Knox con permutación de fechas (Monte Carlo)",
+ "permutaciones": 999,
+ "semilla": 20261123,
+ "catalogo": "v_event_role: Mw >= 4 desde 1960, sin duplicados CSN-USGS",
+ "calculado": "2026-11-24T02:03:30+00:00",
+ "catalogos": {
+  "completo": {
+   "sismos": 44950,
+   "segundos": 210.3,
+   "resultados": [
+    {
+     "delta_km": 10,
+     "tau_dias": 1,
+     "pares_espaciales": 950283,
+     "observado": 10244,
+     "esperado": 461.1,
+     "razon": 22.21,
+     "exceso": 9783,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 10,
+     "tau_dias": 10,
+     "pares_espaciales": 950283,
+     "observado": 25659,
+     "esperado": 2332.3,
+     "razon": 11.0,
+     "exceso": 23327,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 10,
+     "tau_dias": 100,
+     "pares_espaciales": 950283,
+     "observado": 62242,
+     "esperado": 13581.2,
+     "razon": 4.58,
+     "exceso": 48661,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 25,
+     "tau_dias": 1,
+     "pares_espaciales": 4976931,
+     "observado": 36196,
+     "esperado": 2420.3,
+     "razon": 14.96,
+     "exceso": 33776,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 25,
+     "tau_dias": 10,
+     "pares_espaciales": 4976931,
+     "observado": 103740,
+     "esperado": 12227.8,
+     "razon": 8.48,
+     "exceso": 91512,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 25,
+     "tau_dias": 100,
+     "pares_espaciales": 4976931,
+     "observado": 274148,
+     "esperado": 71160.4,
+     "razon": 3.85,
+     "exceso": 202988,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 50,
+     "tau_dias": 1,
+     "pares_espaciales": 15040186,
+     "observado": 78919,
+     "esperado": 7318.0,
+     "razon": 10.78,
+     "exceso": 71601,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 50,
+     "tau_dias": 10,
+     "pares_espaciales": 15040186,
+     "observado": 252855,
+     "esperado": 36973.6,
+     "razon": 6.84,
+     "exceso": 215881,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 50,
+     "tau_dias": 100,
+     "pares_espaciales": 15040186,
+     "observado": 725282,
+     "esperado": 215028.9,
+     "razon": 3.37,
+     "exceso": 510253,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    }
+   ]
+  },
+  "gardner_knopoff": {
+   "sismos": 16621,
+   "segundos": 10.4,
+   "resultados": [
+    {
+     "delta_km": 10,
+     "tau_dias": 1,
+     "pares_espaciales": 46432,
+     "observado": 0,
+     "esperado": 5.1,
+     "razon": 0.0,
+     "exceso": -5,
+     "p_mayor": 1.0,
+     "p_menor": 0.01
+    },
+    {
+     "delta_km": 10,
+     "tau_dias": 10,
+     "pares_espaciales": 46432,
+     "observado": 0,
+     "esperado": 48.0,
+     "razon": 0.0,
+     "exceso": -48,
+     "p_mayor": 1.0,
+     "p_menor": 0.001
+    },
+    {
+     "delta_km": 10,
+     "tau_dias": 100,
+     "pares_espaciales": 46432,
+     "observado": 381,
+     "esperado": 471.3,
+     "razon": 0.81,
+     "exceso": -90,
+     "p_mayor": 1.0,
+     "p_menor": 0.001
+    },
+    {
+     "delta_km": 25,
+     "tau_dias": 1,
+     "pares_espaciales": 263959,
+     "observado": 0,
+     "esperado": 28.6,
+     "razon": 0.0,
+     "exceso": -29,
+     "p_mayor": 1.0,
+     "p_menor": 0.001
+    },
+    {
+     "delta_km": 25,
+     "tau_dias": 10,
+     "pares_espaciales": 263959,
+     "observado": 0,
+     "esperado": 273.2,
+     "razon": 0.0,
+     "exceso": -273,
+     "p_mayor": 1.0,
+     "p_menor": 0.001
+    },
+    {
+     "delta_km": 25,
+     "tau_dias": 100,
+     "pares_espaciales": 263959,
+     "observado": 1877,
+     "esperado": 2678.2,
+     "razon": 0.7,
+     "exceso": -801,
+     "p_mayor": 1.0,
+     "p_menor": 0.001
+    },
+    {
+     "delta_km": 50,
+     "tau_dias": 1,
+     "pares_espaciales": 910917,
+     "observado": 98,
+     "esperado": 97.7,
+     "razon": 1.0,
+     "exceso": 0,
+     "p_mayor": 0.517,
+     "p_menor": 0.519
+    },
+    {
+     "delta_km": 50,
+     "tau_dias": 10,
+     "pares_espaciales": 910917,
+     "observado": 644,
+     "esperado": 940.9,
+     "razon": 0.68,
+     "exceso": -297,
+     "p_mayor": 1.0,
+     "p_menor": 0.001
+    },
+    {
+     "delta_km": 50,
+     "tau_dias": 100,
+     "pares_espaciales": 910917,
+     "observado": 8603,
+     "esperado": 9236.0,
+     "razon": 0.93,
+     "exceso": -633,
+     "p_mayor": 1.0,
+     "p_menor": 0.001
+    }
+   ]
+  },
+  "st_dbscan": {
+   "sismos": 33394,
+   "segundos": 69.7,
+   "resultados": [
+    {
+     "delta_km": 10,
+     "tau_dias": 1,
+     "pares_espaciales": 381425,
+     "observado": 553,
+     "esperado": 43.9,
+     "razon": 12.6,
+     "exceso": 509,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 10,
+     "tau_dias": 10,
+     "pares_espaciales": 381425,
+     "observado": 1355,
+     "esperado": 422.1,
+     "razon": 3.21,
+     "exceso": 933,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 10,
+     "tau_dias": 100,
+     "pares_espaciales": 381425,
+     "observado": 7151,
+     "esperado": 4177.7,
+     "razon": 1.71,
+     "exceso": 2973,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 25,
+     "tau_dias": 1,
+     "pares_espaciales": 2060395,
+     "observado": 1263,
+     "esperado": 235.9,
+     "razon": 5.35,
+     "exceso": 1027,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 25,
+     "tau_dias": 10,
+     "pares_espaciales": 2060395,
+     "observado": 4289,
+     "esperado": 2278.7,
+     "razon": 1.88,
+     "exceso": 2010,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 25,
+     "tau_dias": 100,
+     "pares_espaciales": 2060395,
+     "observado": 31672,
+     "esperado": 22574.5,
+     "razon": 1.4,
+     "exceso": 9098,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 50,
+     "tau_dias": 1,
+     "pares_espaciales": 6435053,
+     "observado": 2086,
+     "esperado": 735.8,
+     "razon": 2.83,
+     "exceso": 1350,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 50,
+     "tau_dias": 10,
+     "pares_espaciales": 6435053,
+     "observado": 10214,
+     "esperado": 7120.4,
+     "razon": 1.43,
+     "exceso": 3094,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    },
+    {
+     "delta_km": 50,
+     "tau_dias": 100,
+     "pares_espaciales": 6435053,
+     "observado": 89352,
+     "esperado": 70497.2,
+     "razon": 1.27,
+     "exceso": 18855,
+     "p_mayor": 0.001,
+     "p_menor": 1.0
+    }
+   ]
+  }
+ }
+}

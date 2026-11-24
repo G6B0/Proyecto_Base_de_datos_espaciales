@@ -27,6 +27,7 @@ scripts/*
 !scripts/render_ui_basemap.py
 !scripts/render_ui_modes.py
 !scripts/plot_declustering.py
+!scripts/knox_test.py
 
 # Respaldos de QGIS y carpetas temporales de herramientas.
 *.qgs~
