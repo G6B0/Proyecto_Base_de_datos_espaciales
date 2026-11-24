@@ -38,5 +38,18 @@ def health():
     return {"status": "ok", **row}
 
 
+class RevalidatedStaticFiles(StaticFiles):
+    """Archivos de app/web/ con Cache-Control: no-cache.
+
+    Sin esa cabecera el navegador puede reutilizar un JavaScript viejo de su
+    caché después de un cambio; así siempre pregunta (y recibe 304 si no cambió).
+    """
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 # Al final: todo lo que no es API se busca en app/web/ (index.html en "/").
-app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
+app.mount("/", RevalidatedStaticFiles(directory=WEB, html=True), name="web")

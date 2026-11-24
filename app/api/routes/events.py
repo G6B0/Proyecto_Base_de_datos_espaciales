@@ -18,7 +18,7 @@ router = APIRouter()
 
 def _filters(year_min: int | None, year_max: int | None, mw_min: float | None,
              depth_min: float | None, depth_max: float | None,
-             source: str, region: str | None) -> tuple[str, dict]:
+             source: str, region: str | None, declustered: bool = False) -> tuple[str, dict]:
     """Arma el WHERE de los filtros de la interfaz con parámetros (nunca texto pegado)."""
     clauses, params = [], {}
     if year_min is not None:
@@ -44,6 +44,12 @@ def _filters(year_min: int | None, year_max: int | None, mw_min: float | None,
     if region:
         clauses.append("e.region_code = %(region)s")
         params["region"] = region
+    if declustered:
+        # Sin replicas ni precursores segun la ejecucion de referencia
+        # (v_event_role: Gardner-Knopoff, Mw >= 4 desde 1960).
+        clauses.append("""EXISTS (SELECT 1 FROM seismic.v_event_role AS r
+                                  WHERE r.earthquake_event_id = e.earthquake_event_id
+                                    AND r.role IN ('mainshock', 'independent'))""")
     return (" AND " + " AND ".join(clauses)) if clauses else "", params
 
 
@@ -53,9 +59,10 @@ def event_tiles(
     year_min: int | None = None, year_max: int | None = None,
     mw_min: float | None = None, depth_min: float | None = None, depth_max: float | None = None,
     source: Literal["ambas", "csn", "usgs"] = "ambas", region: str | None = None,
+    declustered: bool = False,
 ):
     """Tesela vectorial (MVT) de sismos generada por PostGIS con ST_AsMVT."""
-    where, params = _filters(year_min, year_max, mw_min, depth_min, depth_max, source, region)
+    where, params = _filters(year_min, year_max, mw_min, depth_min, depth_max, source, region, declustered)
     params.update(z=z, x=x, y=y)
     sql = f"""
         WITH bounds AS (
@@ -87,8 +94,9 @@ def event_count(
     year_min: int | None = None, year_max: int | None = None,
     mw_min: float | None = None, depth_min: float | None = None, depth_max: float | None = None,
     source: Literal["ambas", "csn", "usgs"] = "ambas", region: str | None = None,
+    declustered: bool = False,
 ):
-    where, params = _filters(year_min, year_max, mw_min, depth_min, depth_max, source, region)
+    where, params = _filters(year_min, year_max, mw_min, depth_min, depth_max, source, region, declustered)
     return fetch_one(f"SELECT count(*) AS events FROM seismic.v_event_location_unique AS e WHERE true{where}",
                      params)
 
@@ -121,7 +129,12 @@ def event_detail(event_id: int):
             link.hypocentral_distance_km::float AS urban_hypo_km,
             impact.max_mmi::float, impact.max_cdi::float, impact.pager_alert, impact.has_shakemap,
             usgs.mw_homogenized::float AS usgs_mw, usgs.source_event_id AS usgs_event_id,
-            role.role AS sequence_role
+            role.role AS sequence_role,
+            round((extract(epoch FROM role.time_from_mainshock) / 86400)::numeric, 3)::float AS days_from_mainshock,
+            role.distance_to_mainshock_km::float AS km_from_mainshock,
+            seq.aftershock_count, seq.foreshock_count,
+            main.earthquake_event_id AS mainshock_id, main.occurred_at AS mainshock_at,
+            main.mw_homogenized::float AS mainshock_mw
         FROM seismic.v_event_location_unique AS e
         LEFT JOIN seismic.event_population_exposure AS x USING (earthquake_event_id)
         LEFT JOIN seismic.event_urban_area AS link
@@ -131,11 +144,9 @@ def event_detail(event_id: int):
         LEFT JOIN seismic.earthquake_event AS usgs ON usgs.earthquake_event_id = pair.usgs_event_id
         LEFT JOIN seismic.event_impact_summary AS impact
                ON impact.earthquake_event_id = coalesce(pair.usgs_event_id, e.earthquake_event_id)
-        LEFT JOIN LATERAL (
-            SELECT r.role FROM seismic.event_sequence_role AS r
-            WHERE r.earthquake_event_id = e.earthquake_event_id
-            ORDER BY r.declustering_run_id DESC LIMIT 1
-        ) AS role ON true
+        LEFT JOIN seismic.v_event_role AS role ON role.earthquake_event_id = e.earthquake_event_id
+        LEFT JOIN seismic.seismic_sequence AS seq ON seq.seismic_sequence_id = role.seismic_sequence_id
+        LEFT JOIN seismic.earthquake_event AS main ON main.earthquake_event_id = seq.mainshock_event_id
         WHERE e.earthquake_event_id = %(id)s
     """, {"id": event_id})
     if not row:
@@ -160,13 +171,14 @@ def per_year(
     first_year: int = 1906, mw_min: float | None = None,
     depth_min: float | None = None, depth_max: float | None = None,
     source: Literal["ambas", "csn", "usgs"] = "ambas", region: str | None = None,
+    declustered: bool = False,
 ):
     """Sismos únicos Mw >= 4 (o el Mw mínimo del filtro, si es mayor) por año.
 
     Respeta los filtros de la interfaz salvo el rango de años, que la línea
     de tiempo muestra como zona resaltada.
     """
-    where, params = _filters(None, None, None, depth_min, depth_max, source, region)
+    where, params = _filters(None, None, None, depth_min, depth_max, source, region, declustered)
     params.update(mw=max(4.0, mw_min or 0), y0=first_year)
     return fetch_all(f"""
         SELECT year, count(e.*) FILTER (WHERE e.mw_homogenized >= %(mw)s) AS events

@@ -105,7 +105,7 @@ La primera vez crea `app\.venv` e instala `app\requirements.txt`; después abre 
 Cada paso deja algo que se ve en el navegador:
 
 1. **Esqueleto** (hecho el 22-11): FastAPI sirviendo `index.html` con la cáscara del diseño; mapa con tierra y regiones desde la base; los sismos por teselas vectoriales con la rampa de colores. Ya se ve "Explorar".
-2. **Explorar completo** (hecho el 22-11; faltan "Ocultar réplicas" y Gi\*, que esperan sus datos): filtros conectados, ficha del sismo al hacer clic, histograma real.
+2. **Explorar completo** (hecho el 22-11; "Ocultar réplicas" y el papel de cada sismo en su secuencia desde el 23-11; falta la capa Gi\* de Ignacio): filtros conectados, ficha del sismo al hacer clic, histograma real.
 3. **Replay** (2–3 dic): animación 1906–2026.
 4. **Anatomía** (3–4 dic): cuando las tablas de réplicas tengan datos; los contornos MMI cuando Ignacio cargue `shakemap_contour`.
 5. **Placa 3D y Mi comuna** (4–5 dic).
