@@ -107,7 +107,7 @@ Cada paso deja algo que se ve en el navegador:
 1. **Esqueleto** (hecho el 22-11): FastAPI sirviendo `index.html` con la cáscara del diseño; mapa con tierra y regiones desde la base; los sismos por teselas vectoriales con la rampa de colores. Ya se ve "Explorar".
 2. **Explorar completo** (hecho el 22-11; "Ocultar réplicas" y el papel de cada sismo en su secuencia desde el 23-11; falta la capa Gi\* de Ignacio): filtros conectados, ficha del sismo al hacer clic, histograma real.
 3. **Replay** (2–3 dic): animación 1906–2026.
-4. **Anatomía** (3–4 dic): cuando las tablas de réplicas tengan datos; los contornos MMI cuando Ignacio cargue `shakemap_contour`.
+4. **Anatomía** (hecho el 24-11, antes de lo planeado): secuencias destacadas o cualquier sismo de una secuencia (botón "Ver anatomía" de la ficha o clic en el mapa), réplicas que se pueden reproducir en el tiempo (escala logarítmica), ventana de Gardner-Knopoff, elipse, comparación con ST-DBSCAN y curva de Omori con tooltip. La URL guarda la secuencia (`#anatomia/23734`). Faltan los contornos MMI y la población expuesta, que llegan con el módulo de Ignacio (`intensity.js`, contrato en el plan, sección 6.5).
 5. **Placa 3D y Mi comuna** (4–5 dic).
 6. **Ensayo de la demo** (6–9 dic): sin internet, en el computador de la presentación, con capturas de respaldo.
 

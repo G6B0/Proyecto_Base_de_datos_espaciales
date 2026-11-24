@@ -3,8 +3,9 @@
 //
 //   const r = createRange(el, { min: 0, max: 700, step: 10, values: [0, 700], onInput, onChange });
 //   r.values -> [a, b];  r.set([a, b])
+//   fill: 'after' (por defecto, "desde el valor") o 'before' ("hasta el valor", para una barra de avance).
 
-export function createRange(container, { min, max, step = 1, values, onInput = () => {}, onChange = () => {} }) {
+export function createRange(container, { min, max, step = 1, values, fill: fillMode = 'after', onInput = () => {}, onChange = () => {} }) {
   container.classList.add('slider-track');
   container.style.cursor = 'pointer';
   container.style.touchAction = 'none';
@@ -46,6 +47,9 @@ export function createRange(container, { min, max, step = 1, values, onInput = (
     if (current.length === 2) {
       fill.style.left = `${pct(current[0])}%`;
       fill.style.right = `${100 - pct(current[1])}%`;
+    } else if (fillMode === 'before') {
+      fill.style.left = '0%';
+      fill.style.right = `${100 - pct(current[0])}%`;
     } else {
       fill.style.left = `${pct(current[0])}%`;
       fill.style.right = '0%';

@@ -33,10 +33,10 @@
           <span class="font-semibold text-sm tracking-tight">Sismos Chile</span>
         </div>
         <div class="w-px h-4 bg-white/10 mx-1"></div>
-        <button class="px-5 py-2 rounded-full bg-white text-black text-sm font-medium" data-mode="explorar">Explorar</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="explorar">Explorar</button>
         <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="replay" title="Próximamente">Replay</button>
         <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="placa3d" title="Próximamente">Placa 3D</button>
-        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="anatomia" title="Próximamente">Anatomía</button>
+        <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="anatomia">Anatomía</button>
         <button class="px-5 py-2 rounded-full text-fg-2 hover:text-white text-sm" data-mode="micomuna" title="Próximamente">Mi comuna</button>
       </nav>
       <div class="flex items-center gap-4 w-[340px] justify-end pointer-events-auto">
@@ -52,7 +52,7 @@
     </header>
 
     <!-- PANEL IZQUIERDO: FILTROS -->
-    <aside class="liquid-glass rounded-3xl p-6 w-[340px] flex flex-col gap-6 absolute left-6 top-[104px]" style="z-index: 20; overflow: visible;">
+    <aside class="mode-explorar liquid-glass rounded-3xl p-6 w-[340px] flex flex-col gap-6 absolute left-6 top-[104px]" style="z-index: 20; overflow: visible;">
       <div>
         <div class="flex items-center justify-between mb-2">
           <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Filtros</span>
@@ -116,7 +116,7 @@
     </aside>
 
     <!-- PANEL DERECHO: SISMO SELECCIONADO -->
-    <aside class="liquid-glass rounded-3xl p-6 w-[340px] absolute right-6 top-[104px]" style="z-index: 20;" id="detail">
+    <aside class="mode-explorar liquid-glass rounded-3xl p-6 w-[340px] absolute right-6 top-[104px]" style="z-index: 20;" id="detail">
       <div class="flex items-center gap-2 mb-2">
         <span class="w-2 h-2 rounded-full bg-white"></span>
         <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Sismo seleccionado</span>
@@ -163,11 +163,11 @@
       </div>
 
       <div class="flex items-center gap-2 mt-4" id="d-chips"></div>
-      <button class="w-full mt-4 bg-white text-black rounded-full py-3 text-sm font-medium opacity-40 cursor-not-allowed" title="Próximamente: modo Anatomía">Ver anatomía del terremoto →</button>
+      <button id="d-anatomy" class="w-full mt-4 bg-white text-black rounded-full py-3 text-sm font-medium transition-transform hover:scale-[1.02] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100" disabled title="Solo para sismos que forman parte de una secuencia">Ver anatomía del terremoto →</button>
     </aside>
 
     <!-- LEYENDA -->
-    <div class="liquid-glass rounded-3xl px-5 py-4 absolute right-[88px] bottom-[128px]" style="z-index: 20;">
+    <div class="mode-explorar liquid-glass rounded-3xl px-5 py-4 absolute right-[88px] bottom-[128px]" style="z-index: 20;">
       <div class="text-[11px] uppercase tracking-[.08em] text-fg-3 mb-3">Magnitud (Mw)</div>
       <div class="flex items-end gap-4">
         <div class="flex flex-col items-center gap-1.5"><span class="rounded-full c-mw-4" style="width:4px;height:4px;"></span><span class="font-mono text-[11px] text-fg-2">4</span></div>
@@ -178,12 +178,12 @@
       </div>
     </div>
 
-    <div class="absolute left-6 bottom-[132px] text-[11px] text-fg-3" style="z-index: 20;">
+    <div class="mode-explorar absolute left-6 bottom-[132px] text-[11px] text-fg-3" style="z-index: 20;">
       Datos: CSN · USGS ComCat · DPA 2023 (SUBDERE/IDE Chile) · Censo 2024 (INE)
     </div>
 
     <!-- LINEA DE TIEMPO: sismos Mw >= 4 por año (datos reales) -->
-    <div class="liquid-glass rounded-full absolute left-6 right-[88px] bottom-6 h-[88px] px-4 flex items-center gap-4" style="z-index: 20;">
+    <div class="mode-explorar liquid-glass rounded-full absolute left-6 right-[88px] bottom-6 h-[88px] px-4 flex items-center gap-4" style="z-index: 20;">
       <button class="liquid-glass-circle w-14 h-14 text-white flex-shrink-0" title="Próximamente: modo Replay">
         <iconify-icon icon="lucide:play" class="text-xl ml-0.5"></iconify-icon>
       </button>
@@ -202,8 +202,89 @@
       </div>
     </div>
 
+
+    <!-- ================= MODO ANATOMÍA ================= -->
+    <!-- PANEL IZQUIERDO: LA SECUENCIA -->
+    <aside class="mode-anatomia hidden liquid-glass rounded-3xl p-6 w-[380px] absolute left-6 top-[104px] panel-scroll" style="z-index: 20;" id="a-panel">
+      <div class="flex gap-1 mb-5 flex-wrap" id="a-presets"></div>
+      <div class="text-[13px] uppercase tracking-[.08em] text-fg-3">Anatomía de un terremoto</div>
+      <h2 class="font-instrument text-[64px] leading-none tracking-tight mt-1" id="a-title">—</h2>
+      <div class="font-mono text-xs text-fg-2 mt-2" id="a-subtitle">Cargando…</div>
+      <div class="grid grid-cols-2 gap-2 mt-5">
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Réplicas</div>
+          <div class="font-mono text-2xl mt-0.5" id="a-aftershocks">—</div>
+          <div class="font-mono text-[11px] text-fg-3 mt-0.5" id="a-foreshocks"></div>
+        </div>
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Primer día</div>
+          <div class="font-mono text-2xl mt-0.5" id="a-firstday">—</div>
+          <div class="font-mono text-[11px] text-fg-3 mt-0.5" id="a-firstday-share"></div>
+        </div>
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Mayor réplica</div>
+          <div class="font-mono text-2xl mt-0.5" id="a-largest">—</div>
+          <div class="font-mono text-[11px] text-fg-3 mt-0.5" id="a-largest-when"></div>
+        </div>
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Omori p</div>
+          <div class="font-mono text-2xl mt-0.5" id="a-omori-p">—</div>
+          <div class="font-mono text-[11px] text-fg-3 mt-0.5" id="a-omori-r2"></div>
+        </div>
+      </div>
+      <div class="flex flex-col text-sm mt-4">
+        <div class="flex justify-between gap-4 border-b border-line py-2.5"><span class="text-fg-3 whitespace-nowrap">Ventana Gardner-Knopoff</span><span class="font-mono text-[12px] text-right" id="a-window">—</span></div>
+        <div class="flex justify-between gap-4 border-b border-line py-2.5"><span class="text-fg-3 whitespace-nowrap">Elipse de las réplicas</span><span class="font-mono text-[12px] text-right" id="a-ellipse">—</span></div>
+        <div class="flex justify-between gap-4 border-b border-line py-2.5"><span class="text-fg-3 whitespace-nowrap">Con ST-DBSCAN</span><span class="font-mono text-[12px] text-right" id="a-dbscan">—</span></div>
+      </div>
+      <div class="mt-4 rounded-2xl bg-white/[.06] px-4 py-3 text-xs text-fg-2 leading-relaxed hidden" id="a-note"></div>
+    </aside>
+
+    <!-- PANEL DERECHO: INTENSIDAD (el módulo de Ignacio completa #a-intensity) -->
+    <aside class="mode-anatomia hidden liquid-glass rounded-3xl p-6 w-[340px] absolute right-6 top-[104px]" style="z-index: 20;" id="a-impact">
+      <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-3">Intensidad · USGS</div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">MMI máxima</div>
+          <div class="flex items-center gap-1.5 mt-0.5"><span class="font-mono text-2xl" id="a-mmi">—</span><span class="px-1.5 py-0.5 rounded text-[10px] font-bold hidden" id="a-mmi-chip"></span></div>
+          <div class="font-mono text-[11px] text-fg-3 mt-0.5">ShakeMap</div>
+        </div>
+        <div class="rounded-2xl border border-white/10 px-3 py-2.5">
+          <div class="text-[11px] uppercase tracking-[.08em] text-fg-3">Reportada</div>
+          <div class="font-mono text-2xl mt-0.5" id="a-cdi">—</div>
+          <div class="font-mono text-[11px] text-fg-3 mt-0.5">"¿Lo sentiste?"</div>
+        </div>
+      </div>
+      <div class="border-t border-line mt-5 pt-4" id="a-intensity">
+        <div class="text-[13px] uppercase tracking-[.08em] text-fg-3">Población expuesta a MMI ≥ VI</div>
+        <div class="text-xs text-fg-2 mt-2 leading-relaxed" id="a-intensity-status">—</div>
+      </div>
+    </aside>
+
+    <!-- LEY DE OMORI -->
+    <div class="mode-anatomia hidden liquid-glass rounded-3xl p-5 absolute right-6 bottom-6 w-[520px]" style="z-index: 20;" id="a-omori">
+      <div class="flex items-baseline justify-between">
+        <div class="text-[13px] uppercase tracking-[.08em] text-fg-3">Ley de Omori · réplicas por día</div>
+        <div class="font-mono text-xs text-fg-2" id="a-omori-law">—</div>
+      </div>
+      <div class="relative mt-2">
+        <svg id="a-omori-chart" class="w-full h-[190px] block" role="img" aria-label="Curva de Omori"></svg>
+        <div id="a-omori-tip" class="chart-tip hidden"></div>
+      </div>
+    </div>
+
+    <!-- REPRODUCIR LAS RÉPLICAS -->
+    <div class="mode-anatomia hidden liquid-glass rounded-full absolute left-6 right-[568px] bottom-6 h-[72px] px-3 flex items-center gap-4" style="z-index: 20;">
+      <button class="liquid-glass-circle w-12 h-12 text-white flex-shrink-0" id="a-play" title="Reproducir las réplicas"><iconify-icon icon="lucide:play" class="text-lg ml-0.5" id="a-play-icon"></iconify-icon></button>
+      <div class="flex-1 min-w-0">
+        <div class="flex justify-between text-[11px] text-fg-3 mb-0.5"><span>Reproducir las réplicas (tiempo en escala logarítmica)</span><span class="font-mono" id="a-span">—</span></div>
+        <div id="a-time" aria-label="Tiempo desde el terremoto"></div>
+      </div>
+      <div class="font-mono text-sm pr-3 flex-shrink-0 w-[130px] text-right leading-tight"><span id="a-time-label">—</span><br><span class="text-[11px] text-fg-3" id="a-time-count"></span></div>
+    </div>
+
     <!-- CONTROLES DEL MAPA -->
-    <div class="absolute right-6 bottom-6 flex flex-col gap-2" style="z-index: 20;">
+    <div class="absolute right-6 bottom-6 flex flex-col gap-2" style="z-index: 20;" id="map-controls">
       <button class="liquid-glass-circle w-12 h-12 text-white" id="btn-zoom-in" title="Acercar"><iconify-icon icon="lucide:plus"></iconify-icon></button>
       <button class="liquid-glass-circle w-12 h-12 text-white" id="btn-zoom-out" title="Alejar"><iconify-icon icon="lucide:minus"></iconify-icon></button>
       <button class="liquid-glass-circle w-12 h-12 text-white" id="btn-home" title="Ver todo Chile"><iconify-icon icon="lucide:locate"></iconify-icon></button>

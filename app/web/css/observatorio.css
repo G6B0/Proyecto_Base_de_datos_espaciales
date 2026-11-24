@@ -81,3 +81,33 @@ body { background: var(--map-ocean); color: var(--fg); font-family: 'Inter', sys
 
 /* Estados de carga de la ficha. */
 .skeleton { color: transparent !important; background: rgba(255,255,255,0.08); border-radius: 6px; }
+
+/* Paneles altos: se desplazan por dentro si la pantalla es baja. */
+.panel-scroll { max-height: calc(100vh - 104px - 112px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.2) transparent; }
+
+/* Tooltip de los gráficos y ventanas emergentes del mapa. */
+.chart-tip, .maplibregl-popup-content {
+  background: rgba(8, 9, 11, 0.92); color: var(--fg); border-radius: 12px; padding: 8px 10px;
+  font: 12px/1.45 'Inter', system-ui, sans-serif;
+  box-shadow: inset 0 1px 1px rgba(255,255,255,.1), 0 0 0 1px rgba(255,255,255,.12), 0 8px 24px rgba(0,0,0,.5);
+}
+.chart-tip { position: absolute; pointer-events: none; white-space: nowrap; transform: translate(-50%, calc(-100% - 10px)); z-index: 5; }
+.maplibregl-popup-tip { display: none; }
+.maplibregl-popup-close-button { color: var(--fg-3); font-size: 16px; padding: 0 6px; }
+
+/* Botones de secuencias destacadas. */
+.chip { padding: 4px 12px; border-radius: 9999px; font-size: 12px; color: var(--fg-2); border: 1px solid rgba(255,255,255,.15); }
+.chip:hover { color: var(--fg); }
+.chip.on { background: #fff; color: #000; font-weight: 500; border-color: #fff; }
+
+/* Curva de Omori. */
+.omori-grid { stroke: rgba(255,255,255,.07); stroke-width: 1; }
+.omori-axis { fill: rgba(255,255,255,.45); font: 10px 'JetBrains Mono', ui-monospace, monospace; }
+.omori-fit { stroke: rgba(255,255,255,.6); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.omori-cursor { stroke: rgba(255,255,255,.5); stroke-width: 1; }
+.omori-pt { fill: #ffa726; stroke: #08090b; stroke-width: 2; }
+.omori-pt-open { fill: #08090b; stroke: #ffa726; stroke-width: 1.5; }
+.omori-hover { r: 6.5; }
+
+/* En Anatomía los controles del mapa suben sobre la curva de Omori. */
+.controls-raised { bottom: 268px !important; }

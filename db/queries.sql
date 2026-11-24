@@ -460,3 +460,46 @@ WHERE main.mw_homogenized >= 6.5
   AND sequence.largest_aftershock_magnitude IS NOT NULL
 GROUP BY run.declustering_run_id, run.method, run.source_code
 ORDER BY run.declustering_run_id;
+
+-- 28. Forma de las secuencias de los grandes terremotos (Mw >= 7,5 desde
+-- 1960): elipse de desviacion estandar de las replicas y exponente de Omori,
+-- segun cada ejecucion. Un eje mayor alineado con la costa (azimut cercano a
+-- 0 o 180) muestra la ruptura en la zona de subduccion.
+SELECT
+    main.occurred_at::date AS fecha,
+    main.mw_homogenized AS mw,
+    run.method AS metodo,
+    coalesce(run.source_code, 'csn+usgs') AS catalogo,
+    run.parameters ->> 'ventana_precursores_dias' AS precursores_dias,
+    ellipse.aftershocks AS replicas,
+    ellipse.major_axis_km AS eje_mayor_km,
+    ellipse.minor_axis_km AS eje_menor_km,
+    ellipse.azimuth_deg AS azimut,
+    omori.omori_p,
+    omori.r2
+FROM seismic.v_sequence_ellipse AS ellipse
+JOIN seismic.declustering_run AS run USING (declustering_run_id)
+JOIN seismic.earthquake_event AS main ON main.earthquake_event_id = ellipse.mainshock_event_id
+LEFT JOIN seismic.v_sequence_omori AS omori USING (seismic_sequence_id)
+WHERE main.mw_homogenized >= 7.5
+  AND main.occurred_at >= '1960-01-01'
+ORDER BY main.occurred_at, run.declustering_run_id;
+
+-- 29. Ley de Omori en todas las secuencias con ajuste (20 o mas replicas y
+-- 5 o mas intervalos): p medio y mediano por ejecucion. En la literatura p
+-- suele estar entre 0,9 y 1,5; valores menores indican catalogos que pierden
+-- replicas al inicio o secuencias cortadas por la ventana.
+SELECT
+    run.declustering_run_id AS run,
+    run.method AS metodo,
+    coalesce(run.source_code, 'csn+usgs') AS catalogo,
+    run.parameters ->> 'ventana_precursores_dias' AS precursores_dias,
+    count(*) AS secuencias,
+    round(avg(omori.omori_p), 2) AS p_medio,
+    round((percentile_cont(0.5) WITHIN GROUP (ORDER BY omori.omori_p))::numeric, 2) AS p_mediana,
+    round(avg(omori.r2), 2) AS r2_medio,
+    round(avg(omori.omori_p) FILTER (WHERE omori.aftershock_count >= 100), 2) AS p_medio_100_replicas
+FROM seismic.v_sequence_omori AS omori
+JOIN seismic.declustering_run AS run USING (declustering_run_id)
+GROUP BY run.declustering_run_id, run.method, run.source_code, run.parameters
+ORDER BY run.declustering_run_id;

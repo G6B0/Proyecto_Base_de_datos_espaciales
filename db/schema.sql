@@ -821,3 +821,124 @@ JOIN preferred USING (declustering_run_id);
 
 COMMENT ON VIEW seismic.v_event_role IS
     'Papel de cada sismo (principal, replica, precursor, independiente) en la ejecucion de referencia: Gardner-Knopoff, catalogo sin duplicados, Mw >= 4, precursores de 30 dias. Sin replicas = role IN (mainshock, independent).';
+
+-- Forma de cada secuencia: elipse de desviacion estandar (1 sigma) de sus
+-- replicas, para todas las ejecuciones. Las coordenadas se pasan a km con la
+-- latitud media de la secuencia (x = lon * 111,32 * cos(lat), y = lat * 110,57);
+-- la covarianza 2x2 se diagonaliza en forma cerrada:
+--   lambda = (sxx + syy) / 2 +- sqrt(((sxx - syy) / 2)^2 + sxy^2)
+--   angulo del eje mayor desde el este = atan2(2 sxy, sxx - syy) / 2
+-- Ejes informados como diametros (2 * sqrt(lambda)); azimut desde el norte.
+CREATE OR REPLACE VIEW seismic.v_sequence_ellipse AS
+WITH moments AS (
+    SELECT role.seismic_sequence_id,
+           count(*) AS aftershocks,
+           avg(ST_X(e.geom)) AS lon0,
+           avg(ST_Y(e.geom)) AS lat0,
+           var_samp(ST_X(e.geom)) AS var_lon,
+           var_samp(ST_Y(e.geom)) AS var_lat,
+           covar_samp(ST_X(e.geom), ST_Y(e.geom)) AS cov_lonlat
+    FROM seismic.event_sequence_role AS role
+    JOIN seismic.earthquake_event AS e USING (earthquake_event_id)
+    WHERE role.role = 'aftershock'
+    GROUP BY role.seismic_sequence_id
+    HAVING count(*) >= 5
+),
+km AS (
+    SELECT m.*,
+           111.32 * cos(radians(m.lat0)) AS kx,
+           110.57::float8 AS ky
+    FROM moments AS m
+),
+covariance AS (
+    SELECT km.*,
+           km.kx * km.kx * km.var_lon AS sxx,
+           km.ky * km.ky * km.var_lat AS syy,
+           km.kx * km.ky * km.cov_lonlat AS sxy
+    FROM km
+),
+eigen AS (
+    SELECT c.*,
+           (c.sxx + c.syy) / 2 + sqrt(((c.sxx - c.syy) / 2) ^ 2 + c.sxy ^ 2) AS lambda_major,
+           greatest((c.sxx + c.syy) / 2 - sqrt(((c.sxx - c.syy) / 2) ^ 2 + c.sxy ^ 2), 0) AS lambda_minor,
+           atan2(2 * c.sxy, c.sxx - c.syy) / 2 AS theta
+    FROM covariance AS c
+)
+SELECT s.declustering_run_id,
+       e.seismic_sequence_id,
+       s.mainshock_event_id,
+       e.aftershocks,
+       round((2 * sqrt(e.lambda_major))::numeric, 1) AS major_axis_km,
+       round((2 * sqrt(e.lambda_minor))::numeric, 1) AS minor_axis_km,
+       round((sqrt(e.lambda_minor) / nullif(sqrt(e.lambda_major), 0))::numeric, 2) AS axis_ratio,
+       round(((90 - degrees(e.theta) + 360)::numeric % 180), 0) AS azimuth_deg,
+       ST_SetSRID(ST_MakePoint(e.lon0, e.lat0), 4326) AS center,
+       (SELECT ST_MakePolygon(ST_MakeLine(
+                   ST_SetSRID(ST_MakePoint(
+                       e.lon0 + (sqrt(e.lambda_major) * cos(phi) * cos(e.theta)
+                                 - sqrt(e.lambda_minor) * sin(phi) * sin(e.theta)) / e.kx,
+                       e.lat0 + (sqrt(e.lambda_major) * cos(phi) * sin(e.theta)
+                                 + sqrt(e.lambda_minor) * sin(phi) * cos(e.theta)) / e.ky), 4326)
+                   ORDER BY k))
+        FROM generate_series(0, 64) AS k,
+             LATERAL (SELECT 2 * pi() * (k % 64) / 64 AS phi) AS angle) AS geom
+FROM eigen AS e
+JOIN seismic.seismic_sequence AS s USING (seismic_sequence_id);
+
+COMMENT ON VIEW seismic.v_sequence_ellipse IS
+    'Elipse de desviacion estandar (1 sigma) de las replicas de cada secuencia con 5 o mas replicas, en todas las ejecuciones de declustering. Ejes en km (diametros) y azimut del eje mayor desde el norte.';
+
+-- Ley de Omori: tasa de replicas por dia en 20 intervalos logaritmicos, desde
+-- 0,01 dias (14 minutos: antes el catalogo pierde replicas tapadas por el
+-- terremoto) hasta la ultima replica. Para secuencias con 20 o mas replicas.
+CREATE OR REPLACE VIEW seismic.v_sequence_omori_bins AS
+WITH aftershocks AS (
+    SELECT role.seismic_sequence_id,
+           extract(epoch FROM role.time_from_mainshock)::float8 / 86400 AS days
+    FROM seismic.event_sequence_role AS role
+    WHERE role.role = 'aftershock'
+      AND role.time_from_mainshock >= interval '864 seconds'
+),
+span AS (
+    SELECT seismic_sequence_id, log(max(days)) + 1e-9 AS log_end
+    FROM aftershocks
+    GROUP BY seismic_sequence_id
+    HAVING count(*) >= 20 AND max(days) > 1
+),
+binned AS (
+    SELECT a.seismic_sequence_id, s.log_end,
+           width_bucket(log(a.days), -2, s.log_end, 20) AS bin,
+           count(*) AS aftershocks
+    FROM aftershocks AS a
+    JOIN span AS s USING (seismic_sequence_id)
+    GROUP BY a.seismic_sequence_id, s.log_end, bin
+)
+SELECT b.seismic_sequence_id, b.bin, b.aftershocks,
+       power(10, -2 + (b.bin - 1) * (b.log_end + 2) / 20) AS from_days,
+       power(10, -2 + b.bin * (b.log_end + 2) / 20) AS to_days,
+       power(10, -2 + (b.bin - 0.5) * (b.log_end + 2) / 20) AS center_days,
+       b.aftershocks / (power(10, -2 + b.bin * (b.log_end + 2) / 20)
+                        - power(10, -2 + (b.bin - 1) * (b.log_end + 2) / 20)) AS per_day
+FROM binned AS b;
+
+COMMENT ON VIEW seismic.v_sequence_omori_bins IS
+    'Replicas por intervalo logaritmico de tiempo (20 intervalos desde 0,01 dias hasta la ultima replica) para la curva de Omori.';
+
+-- Exponente p de Omori, n(t) ~ t^-p: pendiente de la recta log(tasa) vs
+-- log(tiempo) desde 0,05 dias, con al menos 5 intervalos con replicas.
+-- log10_k es el intercepto: tasa ajustada = 10^log10_k * t^-p (t en dias).
+CREATE OR REPLACE VIEW seismic.v_sequence_omori AS
+SELECT s.declustering_run_id, b.seismic_sequence_id, s.mainshock_event_id,
+       s.aftershock_count,
+       round((-regr_slope(log(b.per_day), log(b.center_days)))::numeric, 2) AS omori_p,
+       round(regr_r2(log(b.per_day), log(b.center_days))::numeric, 2) AS r2,
+       regr_count(log(b.per_day), log(b.center_days)) AS bins_used,
+       round(regr_intercept(log(b.per_day), log(b.center_days))::numeric, 3) AS log10_k
+FROM seismic.v_sequence_omori_bins AS b
+JOIN seismic.seismic_sequence AS s USING (seismic_sequence_id)
+WHERE b.center_days > 0.05
+GROUP BY s.declustering_run_id, b.seismic_sequence_id, s.mainshock_event_id, s.aftershock_count
+HAVING regr_count(log(b.per_day), log(b.center_days)) >= 5;
+
+COMMENT ON VIEW seismic.v_sequence_omori IS
+    'Exponente p de la ley de Omori (n(t) ~ t^-p) por secuencia: regresion de log(tasa) contra log(tiempo) desde 0,05 dias.';

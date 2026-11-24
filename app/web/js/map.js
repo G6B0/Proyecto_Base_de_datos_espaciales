@@ -15,7 +15,9 @@ const BASE_RADIUS = ['+', 0.6, ['*', 0.18, ['^', ['-', ['max', MW, 3], 3], 2]]];
 const radius = (k) => ['interpolate', ['linear'], ['zoom'],
   3, ['*', BASE_RADIUS, 1.0 * k], 6, ['*', BASE_RADIUS, 2.0 * k], 9, ['*', BASE_RADIUS, 3.5 * k]];
 const RADIUS = radius(1);
-const OPACITY = ['step', MW, 0.25, 4, 0.45, 5, 0.7, 6, 0.92];
+export const OPACITY = ['step', MW, 0.25, 4, 0.45, 5, 0.7, 6, 0.92];
+export { radius };
+const EMPTY = { type: 'FeatureCollection', features: [] };
 
 export function eventTilesUrl(filters = {}) {
   const params = new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== null && v !== undefined && v !== ''));
@@ -38,7 +40,11 @@ export function createMap() {
         paises: { type: 'geojson', data: '/data/paises.geojson' },
         regiones: { type: 'geojson', data: '/api/areas?level=region' },
         events: { type: 'vector', tiles: [eventTilesUrl()], minzoom: 0, maxzoom: 10 },
-        selected: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+        selected: { type: 'geojson', data: EMPTY },
+        // Modo Anatomía: miembros de la secuencia, ventana de Gardner-Knopoff y elipse.
+        'seq-events': { type: 'geojson', data: EMPTY },
+        'seq-window': { type: 'geojson', data: EMPTY },
+        'seq-ellipse': { type: 'geojson', data: EMPTY },
       },
       layers: [
         { id: 'ocean', type: 'background', paint: { 'background-color': '#030405' } },
@@ -54,6 +60,25 @@ export function createMap() {
         {
           id: 'events', type: 'circle', source: 'events', 'source-layer': 'events',
           paint: { 'circle-color': MW_COLOR, 'circle-radius': RADIUS, 'circle-opacity': OPACITY },
+        },
+        {
+          id: 'seq-window', type: 'line', source: 'seq-window',
+          paint: { 'line-color': 'rgba(255,255,255,0.35)', 'line-width': 1, 'line-dasharray': [1, 3] },
+        },
+        {
+          id: 'seq-events', type: 'circle', source: 'seq-events',
+          paint: {
+            'circle-color': ['case', ['==', ['get', 'role'], 'foreshock'], 'rgba(0,0,0,0)', MW_COLOR],
+            'circle-radius': radius(1.7),
+            'circle-opacity': 0.9,
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': ['case', ['==', ['get', 'role'], 'foreshock'], 1.2, 0],
+            'circle-stroke-opacity': 0.9,
+          },
+        },
+        {
+          id: 'seq-ellipse', type: 'line', source: 'seq-ellipse',
+          paint: { 'line-color': '#ffffff', 'line-width': 1.8, 'line-dasharray': [3, 2] },
         },
         {
           id: 'selected-outer', type: 'circle', source: 'selected',
