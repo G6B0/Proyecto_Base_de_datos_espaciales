@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .db import fetch_one, pool
-from .routes import areas, events
+from .routes import areas, events, sequences
 
 WEB = Path(__file__).resolve().parents[1] / "web"
 
@@ -30,6 +30,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Sismos Chile · Observatorio", lifespan=lifespan)
 app.include_router(events.router)
 app.include_router(areas.router)
+app.include_router(sequences.router)
 
 
 @app.get("/api/health")

@@ -5,8 +5,8 @@ import { setSelected } from '../map.js';
 
 const $ = (id) => document.getElementById(id);
 const BIG_YEARS = new Set([1906, 1922, 1939, 1943, 1960, 1985, 1995, 2010, 2014, 2015]);
-const MMI_COLORS = { 1: '#ffffff', 2: '#bfccff', 3: '#bfccff', 4: '#a0e6ff', 5: '#80ffff', 6: '#7aff93', 7: '#ffff00', 8: '#ffc800', 9: '#ff9100', 10: '#ff0000' };
-const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+export const MMI_COLORS = { 1: '#ffffff', 2: '#bfccff', 3: '#bfccff', 4: '#a0e6ff', 5: '#80ffff', 6: '#7aff93', 7: '#ffff00', 8: '#ffc800', 9: '#ff9100', 10: '#ff0000' };
+export const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
 const ROLE = { mainshock: 'Sismo principal', aftershock: 'Réplica', foreshock: 'Precursor', independent: 'Independiente' };
 const FAMOUS = { '1960-05-22': 'Valdivia 1960', '2010-02-27': 'Maule 2010', '2014-04-01': 'Iquique 2014', '2015-09-16': 'Illapel 2015', '1985-03-03': 'Valparaíso 1985' };
 
@@ -45,16 +45,26 @@ export async function loadHistogram(filters = {}, fromYear = null, toYear = null
   $('histogram-range').textContent = `${lo} – ${hi}`;
 }
 
-function titleFor(e) {
+export function eventTitle(e) {
   const day = e.occurred_at.slice(0, 10);
   if (FAMOUS[day] && e.mw >= 7.5) return FAMOUS[day];
   return e.commune_name ? `${e.commune_name} ${day.slice(0, 4)}` : `Sismo ${day.slice(0, 4)}`;
 }
 
+let selected = null; // sismo de la ficha (para volver desde Anatomía)
+
+export const selectedEvent = () => selected;
+
+export function restoreSelection(map) {
+  setSelected(map, selected?.lon ?? null, selected?.lat ?? null);
+}
+
 export async function showEvent(map, id) {
   const e = await getJSON(`/api/events/${id}`);
+  selected = e;
   setSelected(map, e.lon, e.lat);
-  $('d-title').textContent = titleFor(e);
+  $('d-anatomy').disabled = !e.sequence_role || e.sequence_role === 'independent';
+  $('d-title').textContent = eventTitle(e);
   $('d-date').textContent = fmt.date(e.occurred_at);
   $('d-mw').textContent = fmt.one(e.mw);
   $('d-depth').textContent = e.depth_km === null ? '—' : fmt.int(e.depth_km);
@@ -112,6 +122,7 @@ export function enableClicks(map) {
   map.on('mouseenter', 'events', () => { map.getCanvas().style.cursor = 'pointer'; });
   map.on('mouseleave', 'events', () => { map.getCanvas().style.cursor = ''; });
   map.on('click', 'events', (ev) => {
+    if (document.body.dataset.mode !== 'explorar') return;
     // Entre los puntos bajo el cursor, el de mayor Mw.
     const feature = ev.features.reduce((a, b) => ((b.properties.mw ?? 0) > (a.properties.mw ?? 0) ? b : a));
     showEvent(map, feature.id).catch(console.error);

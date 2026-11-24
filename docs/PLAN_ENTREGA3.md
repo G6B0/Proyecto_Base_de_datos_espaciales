@@ -189,6 +189,10 @@ El esqueleto ya está en `main` (22-11). Para correrlo, con la base encendida: `
 - **Backend** (`app/api/routes/intensity.py`): un endpoint que devuelve los contornos de un sismo y su población expuesta a MMI ≥ VI, y otro con los hexágonos de Gi\*. Sigue el modelo de `app/api/routes/events.py`: `router = APIRouter()` y las consultas con `fetch_one` / `fetch_all` de `app/api/db.py`, siempre con parámetros (`%(nombre)s`), nunca con texto pegado.
 - **Registrar la ruta:** `app/api/main.py` es de Gabriel. Cuando exista tu `intensity.py`, avísale y él agrega la línea `app.include_router(intensity.router)`.
 - **Frontend** (`app/web/js/intensity.js`): al elegir un sismo con ShakeMap, dibujar sus contornos coloreados por MMI y mostrar la población expuesta; una capa activable con las zonas calientes. Las capas se agregan al mapa de MapLibre igual que en `app/web/js/map.js` (una fuente GeoJSON más capas `fill` y `line`).
+- **Cómo se conecta con el modo Anatomía (ya hecho, 24-11):** `app/web/js/modes/anatomia.js` carga tu archivo solo si existe (mientras no exista, el panel derecho dice que los contornos llegan con tu módulo). Tu `intensity.js` debe exportar dos funciones:
+  - `export async function showIntensity(map, eventId, container)`: dibuja los contornos del sismo `eventId` (el principal de la secuencia) y escribe en `container` (el `<div id="a-intensity">` del panel derecho) la leyenda MMI y la población expuesta. Devuelve `true` si había ShakeMap y `false` si no.
+  - `export function clearIntensity(map)`: borra tus capas (se llama al cambiar de secuencia o volver a Explorar).
+  - Pon tus capas debajo de las réplicas: `map.addLayer(capa, 'seq-window')`.
 - **Cómo debe verse:** la pantalla de Anatomía del diseño (`docs/design/04_anatomia.html`) y los colores oficiales MMI del sistema de diseño (`.superdesign/design-system.md`, sección 3.2). `scripts/render_ui_modes.py` ya dibuja los contornos del Maule con esos colores; sirve de referencia.
 
 ### 6.6 Mapas, informe y presentación (paso 10)
@@ -218,10 +222,10 @@ El esqueleto ya está en `main` (22-11). Para correrlo, con la base encendida: `
 | 1. USGS completo + `event_impact_summary` | Gabriel | **Hecho** (22-11): 31.007 sismos USGS; 5.321 resúmenes de impacto (1.165 con ShakeMap) |
 | 2. `event_match` + `Mlv` | Gabriel | **Hecho** (22-11): 29.219 pares; 61.133 sismos únicos; `Mlv` calibrada (−0,09); consultas 16 a 19 |
 | 3. Réplicas: Gardner-Knopoff y ST-DBSCAN | Gabriel | **Hecho** (23-11): 4 ejecuciones (GK sin duplicados con precursores de 30 días, GK con ventana simétrica, GK solo USGS y ST-DBSCAN); Båth 1,19; consultas 25 a 27 |
-| 4. Test de Knox, elipses, Omori y Båth | Gabriel | **Knox y Båth hechos** (23-11; `docs/analisis/KNOX.md`): GK elimina la interacción (incluso de más), ST-DBSCAN deja una parte. Pendiente: elipses y Omori de todas las secuencias (hoy solo el Maule, en `scripts/render_ui_modes.py`) |
+| 4. Test de Knox, elipses, Omori y Båth | Gabriel | **Hecho** (24-11). Knox y Båth (`docs/analisis/KNOX.md`): GK elimina la interacción (incluso de más), ST-DBSCAN deja una parte. Elipses y Omori de todas las secuencias en SQL (`v_sequence_ellipse`, `v_sequence_omori`; consultas 28 y 29; `docs/analisis/SECUENCIAS.md`): las rupturas siguen la fosa; p de 0,76 a 1,06 en los grandes terremotos |
 | 5. Descargador de ShakeMap | Ignacio | Pendiente |
 | 6. Carga de contornos | Ignacio | Pendiente |
 | 7. Población expuesta a MMI ≥ VI | Ignacio | Pendiente |
 | 8. Zonas calientes Gi\* | Ignacio | Pendiente |
-| 9. Interfaz (núcleo / módulo de intensidad) | Gabriel / Ignacio | Pendiente |
+| 9. Interfaz (núcleo / módulo de intensidad) | Gabriel / Ignacio | Explorar y **Anatomía** hechos (24-11; `GET /api/sequences/{id}`). Pendientes: Replay, Placa 3D, Mi comuna (Gabriel); módulo de intensidad (Ignacio, contrato en 6.5) |
 | 10. Informe y presentación | Ambos | Pendiente |
