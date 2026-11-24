@@ -82,13 +82,30 @@ export async function showEvent(map, id) {
   $('d-pop50').textContent = fmt.people(e.population_50km);
   $('d-pop100').textContent = fmt.people(e.population_100km);
   $('d-published').textContent = e.magnitude === null ? '—' : `${fmt.one(e.magnitude)} ${e.magnitude_type ?? ''}`;
-  $('d-role').textContent = e.sequence_role ? ROLE[e.sequence_role] : 'pendiente (paso 3)';
+  $('d-role').textContent = roleText(e);
 
   const chips = [];
   if (e.also_in_usgs) chips.push(`También publicado por USGS${e.usgs_mw ? ` · Mw ${fmt.one(e.usgs_mw)}` : ''}`);
   if (e.source === 'usgs') chips.push('Solo en USGS');
   if (e.pager_alert) chips.push(`Alerta PAGER ${e.pager_alert}`);
   $('d-chips').innerHTML = chips.map((c) => `<span class="px-3 py-1 rounded-full border border-white/15 text-xs text-fg-2">${c}</span>`).join('');
+}
+
+// Papel en la secuencia según la ejecución de referencia de Gardner-Knopoff.
+function roleText(e) {
+  if (!e.sequence_role) return e.mw !== null && e.mw >= 4 ? 'Fuera del análisis (antes de 1960)' : 'Fuera del análisis (Mw < 4)';
+  if (e.sequence_role === 'independent') return 'Independiente';
+  if (e.sequence_role === 'mainshock') {
+    const parts = [`${fmt.int(e.aftershock_count)} réplicas`];
+    if (e.foreshock_count) parts.push(`${fmt.int(e.foreshock_count)} precursores`);
+    return `Sismo principal · ${parts.join(' · ')}`;
+  }
+  const main = `Mw ${fmt.one(e.mainshock_mw)} del ${e.mainshock_at.slice(8, 10)}-${e.mainshock_at.slice(5, 7)}-${e.mainshock_at.slice(0, 4)}`;
+  const days = Math.abs(e.days_from_mainshock);
+  const hours = days * 24;
+  const when = hours < 1 ? 'menos de 1 h' : days < 1 ? `${fmt.int(hours)} h` : `${fmt.int(days)} días`;
+  const rel = e.sequence_role === 'aftershock' ? `${when} después` : `${when} antes`;
+  return `${ROLE[e.sequence_role]} del ${main} · ${rel} · ${fmt.int(e.km_from_mainshock)} km`;
 }
 
 export function enableClicks(map) {

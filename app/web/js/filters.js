@@ -12,7 +12,7 @@ const DEPTH_MAX = 700;
 
 export function setupFilters(map, summary) {
   const lastYear = summary.last_year;
-  const state = { years: [YEAR_FLOOR, lastYear], mw: 0, depth: [0, DEPTH_MAX], region: null, source: 'ambas' };
+  const state = { years: [YEAR_FLOOR, lastYear], mw: 0, depth: [0, DEPTH_MAX], region: null, source: 'ambas', declustered: false };
   let regions = [];
 
   const query = () => {
@@ -24,6 +24,7 @@ export function setupFilters(map, summary) {
     if (state.depth[1] < DEPTH_MAX) q.depth_max = state.depth[1];
     if (state.region) q.region = state.region;
     if (state.source !== 'ambas') q.source = state.source;
+    if (state.declustered) q.declustered = true;
     return q;
   };
   const isFiltered = () => Object.keys(query()).length > 0;
@@ -52,7 +53,10 @@ export function setupFilters(map, summary) {
       const { events } = await getJSON(`/api/events/count${params ? `?${params}` : ''}`);
       if (id !== requestId) return; // llegó una respuesta más nueva
       $('count-unique').textContent = fmt.int(events);
-      $('count-caption').textContent = isFiltered() ? 'Sismos con estos filtros' : 'Sismos únicos';
+      $('count-caption').textContent = state.declustered ? 'Sin réplicas · Mw ≥ 4'
+        : isFiltered() ? 'Sismos con estos filtros' : 'Sismos únicos';
+      // El declustering parte en 1960; los años se muestran acordes.
+      $('count-years').textContent = state.declustered ? `1960–${lastYear}` : `${summary.first_year}–${lastYear}`;
       const { year_min, year_max, ...rest } = q; // el histograma muestra todos los años
       loadHistogram(rest, state.years[0] === YEAR_FLOOR ? null : state.years[0], state.years[1]).catch(console.error);
     }, 220);
@@ -112,12 +116,20 @@ export function setupFilters(map, summary) {
   document.addEventListener('click', (ev) => { if (!menu.contains(ev.target)) menu.classList.add('hidden'); });
   getJSON('/api/regions').then((r) => { regions = r; }).catch(console.error);
 
+  // Ocultar réplicas (ejecución de referencia de Gardner-Knopoff).
+  function renderDeclustered() {
+    $('f-declustered-toggle').classList.toggle('on', state.declustered);
+    $('f-declustered').setAttribute('aria-pressed', String(state.declustered));
+  }
+  $('f-declustered').addEventListener('click', () => { state.declustered = !state.declustered; renderDeclustered(); apply(); });
+
   // Limpiar.
   $('f-reset').addEventListener('click', () => {
     state.years = [YEAR_FLOOR, lastYear]; years.set(state.years);
     state.mw = 0; mw.set([0]);
     state.depth = [0, DEPTH_MAX]; depth.set(state.depth);
     state.source = 'ambas'; renderSource();
+    state.declustered = false; renderDeclustered();
     if (state.region) selectRegion(null); else apply();
   });
 
