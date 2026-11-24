@@ -52,28 +52,31 @@
     </header>
 
     <!-- PANEL IZQUIERDO: FILTROS -->
-    <aside class="liquid-glass rounded-3xl p-6 w-[340px] flex flex-col gap-6 absolute left-6 top-[104px]" style="z-index: 20;">
+    <aside class="liquid-glass rounded-3xl p-6 w-[340px] flex flex-col gap-6 absolute left-6 top-[104px]" style="z-index: 20; overflow: visible;">
       <div>
-        <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-2">Filtros</div>
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Filtros</span>
+          <button id="f-reset" class="hidden text-xs text-fg-2 hover:text-white underline underline-offset-4">Limpiar</button>
+        </div>
         <div class="font-instrument text-7xl tracking-tight leading-none" id="count-unique">—</div>
-        <div class="font-mono text-xs text-fg-2 uppercase tracking-widest mt-2">Sismos únicos · <span id="count-years">—</span></div>
+        <div class="font-mono text-xs text-fg-2 uppercase tracking-widest mt-2"><span id="count-caption">Sismos únicos</span> · <span id="count-years">—</span></div>
         <div class="font-mono text-[11px] text-fg-3 mt-1"><span id="count-records">—</span> registros · <span id="count-pairs">—</span> pares CSN–USGS</div>
       </div>
 
       <div>
         <div class="flex justify-between items-center mb-3">
           <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Años</span>
-          <span class="font-mono text-sm">1906 – 2026</span>
+          <span class="font-mono text-sm" id="f-years-label">—</span>
         </div>
-        <div class="slider-track"><div class="slider-fill" style="left: 0; right: 0;"></div><div class="slider-thumb" style="left: 0"></div><div class="slider-thumb" style="left: 100%"></div></div>
+        <div id="f-years" aria-label="Rango de años"></div>
       </div>
 
       <div>
         <div class="flex justify-between items-center mb-3">
           <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Magnitud (Mw)</span>
-          <span class="font-mono text-sm">todas</span>
+          <span class="font-mono text-sm" id="f-mw-label">todas</span>
         </div>
-        <div class="slider-track"><div class="slider-fill" style="left: 0; right: 0;"></div><div class="slider-thumb" style="left: 0"></div></div>
+        <div id="f-mw" aria-label="Magnitud mínima"></div>
         <div class="flex mt-3 h-1.5 rounded-full overflow-hidden">
           <div class="flex-1 c-mw-3"></div><div class="flex-1 c-mw-4"></div><div class="flex-1 c-mw-45"></div>
           <div class="flex-1 c-mw-5"></div><div class="flex-1 c-mw-6"></div><div class="flex-1 c-mw-7"></div><div class="flex-1 c-mw-8"></div>
@@ -83,30 +86,32 @@
       <div>
         <div class="flex justify-between items-center mb-3">
           <span class="text-[13px] uppercase tracking-[.08em] text-fg-3">Profundidad</span>
-          <span class="font-mono text-sm">0 – 700 km</span>
+          <span class="font-mono text-sm" id="f-depth-label">—</span>
         </div>
-        <div class="slider-track"><div class="slider-fill" style="left: 0; right: 0;"></div><div class="slider-thumb" style="left: 0"></div><div class="slider-thumb" style="left: 100%"></div></div>
+        <div id="f-depth" aria-label="Rango de profundidad"></div>
       </div>
 
-      <div class="border-t border-line pt-5">
+      <div class="border-t border-line pt-5 relative">
         <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-2">Región</div>
-        <button class="w-full flex justify-between items-center py-1 text-sm text-fg-2 hover:text-white">
-          <span>Todas las regiones</span><iconify-icon icon="lucide:chevron-down"></iconify-icon>
+        <button id="f-region" class="w-full flex justify-between items-center py-1 text-sm text-fg-2 hover:text-white">
+          <span id="f-region-label">Todas las regiones</span><iconify-icon icon="lucide:chevron-down"></iconify-icon>
         </button>
+        <div id="f-region-menu" class="hidden absolute left-0 right-0 top-full mt-2 p-2 rounded-2xl flex flex-col gap-0.5 max-h-[360px] overflow-y-auto"
+             style="z-index: 40; background: rgba(8,9,11,0.92); backdrop-filter: blur(14px); box-shadow: inset 0 1px 1px rgba(255,255,255,.1), 0 0 0 1px rgba(255,255,255,.12);"></div>
       </div>
 
       <div class="border-t border-line pt-5">
         <div class="text-[13px] uppercase tracking-[.08em] text-fg-3 mb-3">Fuente</div>
         <div class="flex gap-2">
-          <button class="flex-1 py-1.5 rounded-full bg-white text-black text-xs font-medium">Ambas</button>
-          <button class="flex-1 py-1.5 rounded-full text-fg-2 text-xs border border-white/15">CSN</button>
-          <button class="flex-1 py-1.5 rounded-full text-fg-2 text-xs border border-white/15">USGS</button>
+          <button data-source="ambas">Ambas</button>
+          <button data-source="csn">CSN</button>
+          <button data-source="usgs">USGS</button>
         </div>
       </div>
 
       <div class="border-t border-line pt-5 flex flex-col gap-3 text-sm">
-        <label class="flex items-center justify-between gap-3"><span class="text-fg-2">Ocultar réplicas</span><span class="toggle"></span></label>
-        <label class="flex items-center justify-between gap-3"><span class="text-fg-2">Zonas calientes (Gi*)</span><span class="toggle"></span></label>
+        <label class="flex items-center justify-between gap-3 opacity-40 cursor-not-allowed" title="Disponible cuando estén calculadas las réplicas (paso 3 del plan)"><span class="text-fg-2">Ocultar réplicas</span><span class="toggle"></span></label>
+        <label class="flex items-center justify-between gap-3 opacity-40 cursor-not-allowed" title="Disponible cuando Ignacio calcule Gi* (paso 8 del plan)"><span class="text-fg-2">Zonas calientes (Gi*)</span><span class="toggle"></span></label>
       </div>
     </aside>
 

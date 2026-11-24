@@ -2,6 +2,7 @@
 
 import { getJSON } from './api.js';
 import { createMap, fitChile } from './map.js';
+import { setupFilters } from './filters.js';
 import { enableClicks, loadHistogram, loadSummary, showEvent } from './modes/explorar.js';
 
 const map = createMap();
@@ -22,7 +23,7 @@ async function checkHealth() {
 map.on('load', async () => {
   enableClicks(map);
   checkHealth();
-  loadSummary().catch(console.error);
+  loadSummary().then((summary) => setupFilters(map, summary)).catch(console.error);
   loadHistogram().catch(console.error);
   // Se abre con el Maule 2010 seleccionado, como en el diseño.
   try {

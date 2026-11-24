@@ -156,12 +156,22 @@ def summary():
 
 
 @router.get("/api/stats/years")
-def per_year(mw_min: float = 4.0, year_min: int = 1906):
-    """Sismos únicos por año (histograma de la línea de tiempo)."""
-    return fetch_all("""
+def per_year(
+    first_year: int = 1906, mw_min: float | None = None,
+    depth_min: float | None = None, depth_max: float | None = None,
+    source: Literal["ambas", "csn", "usgs"] = "ambas", region: str | None = None,
+):
+    """Sismos únicos Mw >= 4 (o el Mw mínimo del filtro, si es mayor) por año.
+
+    Respeta los filtros de la interfaz salvo el rango de años, que la línea
+    de tiempo muestra como zona resaltada.
+    """
+    where, params = _filters(None, None, None, depth_min, depth_max, source, region)
+    params.update(mw=max(4.0, mw_min or 0), y0=first_year)
+    return fetch_all(f"""
         SELECT year, count(e.*) FILTER (WHERE e.mw_homogenized >= %(mw)s) AS events
         FROM generate_series(%(y0)s, extract(year FROM now())::int) AS year
         LEFT JOIN seismic.v_event_location_unique AS e
-               ON e.occurred_at >= make_date(year, 1, 1) AND e.occurred_at < make_date(year + 1, 1, 1)
+               ON e.occurred_at >= make_date(year, 1, 1) AND e.occurred_at < make_date(year + 1, 1, 1){where}
         GROUP BY year ORDER BY year
-    """, {"mw": mw_min, "y0": year_min})
+    """, params)

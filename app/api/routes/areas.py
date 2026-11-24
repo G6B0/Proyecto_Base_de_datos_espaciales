@@ -7,7 +7,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Response
 
-from ..db import fetch_one
+from ..db import fetch_all, fetch_one
 
 router = APIRouter()
 
@@ -33,6 +33,24 @@ def _areas_geojson(level: str) -> str:
         WHERE a.level = %(level)s
     """, {"level": level, "tol": TOLERANCE[level]})
     return row["geojson"]
+
+
+@lru_cache(maxsize=1)
+def _regions() -> list[dict]:
+    return fetch_all("""
+        SELECT official_code AS code, name,
+               round(ST_XMin(geom)::numeric, 3)::float AS west, round(ST_YMin(geom)::numeric, 3)::float AS south,
+               round(ST_XMax(geom)::numeric, 3)::float AS east, round(ST_YMax(geom)::numeric, 3)::float AS north
+        FROM seismic.administrative_area
+        WHERE level = 'region'
+        ORDER BY ST_Y(ST_PointOnSurface(geom)) DESC
+    """)
+
+
+@router.get("/api/regions")
+def regions():
+    """Las 16 regiones de norte a sur, con su rectángulo para hacer zoom."""
+    return _regions()
 
 
 @router.get("/api/areas")

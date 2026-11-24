@@ -16,25 +16,33 @@ export async function loadSummary() {
   $('count-years').textContent = `${s.first_year}–${s.last_year}`;
   $('count-records').textContent = fmt.int(s.records);
   $('count-pairs').textContent = fmt.int(s.pairs);
+  return s;
 }
 
-export async function loadHistogram() {
-  const rows = await getJSON('/api/stats/years?mw_min=4&year_min=1906');
-  const peak = Math.sqrt(Math.max(...rows.map((r) => r.events)));
-  $('histogram').innerHTML = rows.map((r) => {
-    const h = Math.max(3, Math.round((Math.sqrt(r.events) / peak) * 100));
-    const op = BIG_YEARS.has(r.year) ? 0.9 : 0.4;
-    return `<div class="flex-1 rounded-t-sm bg-white" style="height:${h}%;opacity:${op}" title="${r.year}: ${fmt.int(r.events)} sismos Mw ≥ 4"></div>`;
-  }).join('');
+// Histograma de la línea de tiempo: sismos Mw >= 4 por año con los filtros
+// actuales (salvo los años); el rango de años elegido queda resaltado.
+export async function loadHistogram(filters = {}, fromYear = null, toYear = null) {
+  const params = new URLSearchParams({ first_year: 1906, ...filters }).toString();
+  const rows = await getJSON(`/api/stats/years?${params}`);
+  const peak = Math.sqrt(Math.max(1, ...rows.map((r) => r.events)));
   const first = rows[0].year;
   const last = rows[rows.length - 1].year;
+  const lo = fromYear ?? first;
+  const hi = toYear ?? last;
+  const threshold = Math.max(4, Number(filters.mw_min ?? 0));
+  $('histogram').innerHTML = rows.map((r) => {
+    const h = r.events ? Math.max(3, Math.round((Math.sqrt(r.events) / peak) * 100)) : 0;
+    const inRange = r.year >= lo && r.year <= hi;
+    const op = !inRange ? 0.1 : BIG_YEARS.has(r.year) ? 0.9 : 0.4;
+    return `<div class="flex-1 rounded-t-sm bg-white" style="height:${h}%;opacity:${op}" title="${r.year}: ${fmt.int(r.events)} sismos Mw ≥ ${fmt.one(threshold)}"></div>`;
+  }).join('');
   const span = last - first;
   $('histogram-ticks').innerHTML = [first, 1930, 1960, 1990, last].map((y) => {
     const pct = ((y - first) / span) * 100;
     const tr = y === first ? 'translateX(0)' : y === last ? 'translateX(-100%)' : 'translateX(-50%)';
     return `<span class="absolute font-mono text-[10px] text-fg-3" style="left:${pct.toFixed(2)}%;transform:${tr}">${y}</span>`;
   }).join('');
-  $('histogram-range').textContent = `${first} – ${last}`;
+  $('histogram-range').textContent = `${lo} – ${hi}`;
 }
 
 function titleFor(e) {
