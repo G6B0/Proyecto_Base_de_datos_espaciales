@@ -26,6 +26,7 @@ scripts/*
 !scripts/build_drawio_model.py
 !scripts/render_ui_basemap.py
 !scripts/render_ui_modes.py
+!scripts/plot_declustering.py
 
 # Respaldos de QGIS y carpetas temporales de herramientas.
 *.qgs~
