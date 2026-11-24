@@ -175,7 +175,7 @@ El borrador de la consulta está en [MODELO_LOGICO_v2.md](MODELO_LOGICO_v2.md), 
 Diapositivas 34 a 44 de la materia. Responde **dónde se concentra la sismicidad más de lo esperable**.
 
 - **Unidad espacial:** una grilla de hexágonos (`ST_HexagonGrid`, por ejemplo de 25 km de lado) sobre Chile y su costa. Créala en un sistema proyectado en metros (por ejemplo EPSG:32719, UTM 19S, el mismo del mapa del proyecto QGIS) y transfórmala a 4326 para cruzarla con los sismos; en 4326 el tamaño estaría en grados. No usamos comunas porque sus tamaños son muy distintos (problema de la unidad de área modificable, MAUP: diapositiva 8).
-- **Variable:** cantidad de sismos Mw ≥ 4 por hexágono, del catálogo **sin réplicas** (sismos `mainshock` e `independent` de la ejecución de Gardner-Knopoff que publique Gabriel). Mientras no exista, prueba con `v_event_location_unique`.
+- **Variable:** cantidad de sismos Mw ≥ 4 por hexágono, del catálogo **sin réplicas**: los sismos de `v_event_location_unique` cuyo papel en la vista `seismic.v_event_role` es `mainshock` o `independent` (Gardner-Knopoff de referencia, disponible desde el 23-11; 16.621 sismos Mw ≥ 4 desde 1960). Para la comparación "con réplicas", usa todos.
 - **Vecindad:** hexágonos a una distancia fija (por ejemplo, los que se tocan más el propio, que es lo que define Gi\* con asterisco).
 - **Cálculo en SQL:** la fórmula de Gi\* (puntaje z) se puede escribir con sumas sobre los vecinos. Clasifica cada hexágono en zona caliente o fría con 90, 95 o 99 % de confianza.
 - **Cuidado:** al probar cientos de hexágonos a la vez aparecen falsos positivos (diapositiva 40). Menciona la corrección (Bonferroni o FDR) en el informe.
@@ -217,7 +217,7 @@ El esqueleto ya está en `main` (22-11). Para correrlo, con la base encendida: `
 |---|---|---|
 | 1. USGS completo + `event_impact_summary` | Gabriel | **Hecho** (22-11): 31.007 sismos USGS; 5.321 resúmenes de impacto (1.165 con ShakeMap) |
 | 2. `event_match` + `Mlv` | Gabriel | **Hecho** (22-11): 29.219 pares; 61.133 sismos únicos; `Mlv` calibrada (−0,09); consultas 16 a 19 |
-| 3. Réplicas: Gardner-Knopoff y ST-DBSCAN | Gabriel | Pendiente (borrador probado sobre el CSN) |
+| 3. Réplicas: Gardner-Knopoff y ST-DBSCAN | Gabriel | **Hecho** (23-11): 4 ejecuciones (GK sin duplicados con precursores de 30 días, GK con ventana simétrica, GK solo USGS y ST-DBSCAN); Båth 1,19; consultas 25 a 27 |
 | 4. Test de Knox, elipses, Omori y Båth | Gabriel | Pendiente |
 | 5. Descargador de ShakeMap | Ignacio | Pendiente |
 | 6. Carga de contornos | Ignacio | Pendiente |

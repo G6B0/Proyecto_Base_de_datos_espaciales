@@ -672,6 +672,21 @@ CREATE TABLE IF NOT EXISTS seismic.declustering_run (
         CHECK (period_start IS NULL OR period_end IS NULL OR period_start <= period_end)
 );
 
+-- Entrega 3 (2026-11-23): una ejecucion puede correr sobre una sola fuente
+-- (catalog = 'source', con source_code) o sobre el catalogo sin duplicados
+-- v_event_location_unique (catalog = 'unique', sin source_code: mezcla CSN y
+-- USGS). Se agrega ST-DBSCAN a los metodos. Idempotente sobre bases antiguas.
+ALTER TABLE seismic.declustering_run
+    ADD COLUMN IF NOT EXISTS catalog text NOT NULL DEFAULT 'source';
+ALTER TABLE seismic.declustering_run ALTER COLUMN source_code DROP NOT NULL;
+ALTER TABLE seismic.declustering_run DROP CONSTRAINT IF EXISTS declustering_run_method_check;
+ALTER TABLE seismic.declustering_run ADD CONSTRAINT declustering_run_method_check
+    CHECK (method IN ('gardner_knopoff_1974', 'reasenberg_1985', 'zaliapin_2008', 'st_dbscan'));
+ALTER TABLE seismic.declustering_run DROP CONSTRAINT IF EXISTS declustering_run_catalog_check;
+ALTER TABLE seismic.declustering_run ADD CONSTRAINT declustering_run_catalog_check
+    CHECK ((catalog = 'source' AND source_code IS NOT NULL)
+        OR (catalog = 'unique' AND source_code IS NULL));
+
 -- Una secuencia: sismo principal con sus precursores y replicas.
 CREATE TABLE IF NOT EXISTS seismic.seismic_sequence (
     seismic_sequence_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -754,7 +769,7 @@ COMMENT ON TABLE seismic.magnitude_estimate IS
 COMMENT ON TABLE seismic.event_match IS
     'Pares CSN-USGS que corresponden al mismo sismo. Lo llena db/match_events.sql: candidatos a 60 s y 100 km o menos, asignacion voraz uno a uno por puntaje.';
 COMMENT ON TABLE seismic.declustering_run IS
-    'Una ejecucion de un metodo de declustering (Gardner-Knopoff, Reasenberg, Zaliapin) con sus parametros. Se llena en la entrega 3.';
+    'Una ejecucion de un metodo de declustering (Gardner-Knopoff, ST-DBSCAN, Reasenberg, Zaliapin) con sus parametros y el catalogo usado (una fuente o el catalogo sin duplicados). La llenan db/decluster_gardner_knopoff.sql y db/decluster_st_dbscan.sql.';
 COMMENT ON TABLE seismic.seismic_sequence IS
     'Secuencias sismicas: sismo principal, cantidad de precursores y replicas, duracion y zona (footprint). Se llena en la entrega 3.';
 COMMENT ON TABLE seismic.event_sequence_role IS
@@ -783,3 +798,26 @@ WHERE NOT EXISTS (
 
 COMMENT ON VIEW seismic.v_event_location_unique IS
     'Un registro por sismo: CSN completo mas los sismos USGS sin par en event_match.';
+
+-- Ejecucion de referencia del declustering (la que usan la interfaz y Gi*):
+-- Gardner-Knopoff sobre el catalogo sin duplicados, Mw >= 4 y precursores de
+-- 30 dias (db/decluster_gardner_knopoff.sql con sus valores por defecto).
+-- Se define por sus parametros y no por su numero, que cambia en cada base.
+CREATE OR REPLACE VIEW seismic.v_event_role AS
+WITH preferred AS (
+    SELECT declustering_run_id
+    FROM seismic.declustering_run
+    WHERE method = 'gardner_knopoff_1974'
+      AND catalog = 'unique'
+      AND minimum_magnitude = 4.0
+      AND parameters ->> 'ventana_precursores_dias' = '30'
+    ORDER BY executed_at DESC
+    LIMIT 1
+)
+SELECT role.earthquake_event_id, role.role, role.seismic_sequence_id,
+       role.time_from_mainshock, role.distance_to_mainshock_km, role.declustering_run_id
+FROM seismic.event_sequence_role AS role
+JOIN preferred USING (declustering_run_id);
+
+COMMENT ON VIEW seismic.v_event_role IS
+    'Papel de cada sismo (principal, replica, precursor, independiente) en la ejecucion de referencia: Gardner-Knopoff, catalogo sin duplicados, Mw >= 4, precursores de 30 dias. Sin replicas = role IN (mainshock, independent).';

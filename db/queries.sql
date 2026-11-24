@@ -397,3 +397,66 @@ FROM seismic.v_event_location_unique
 WHERE source_code = 'usgs'
 GROUP BY 1
 ORDER BY 1;
+
+
+-- ---------------------------------------------------------------------------
+-- Replicas (entrega 3; db/decluster_gardner_knopoff.sql y db/decluster_st_dbscan.sql).
+-- Cada ejecucion de un metodo queda en declustering_run con sus parametros.
+-- ---------------------------------------------------------------------------
+
+-- 25. Resumen de cada ejecucion: cuantos sismos quedan como principales,
+-- replicas, precursores e independientes, y que fraccion del catalogo queda
+-- al quitar las replicas y precursores (catalogo "desagrupado").
+SELECT
+    run.declustering_run_id AS run,
+    run.method AS metodo,
+    coalesce(run.source_code, 'csn+usgs') AS catalogo,
+    coalesce(run.parameters ->> 'ventana_precursores_dias',
+             (run.parameters ->> 'eps_km') || ' km · ' || (run.parameters ->> 'eps_dias') || ' d') AS parametro,
+    count(*) AS sismos,
+    count(*) FILTER (WHERE role.role = 'mainshock') AS principales,
+    count(*) FILTER (WHERE role.role = 'aftershock') AS replicas,
+    count(*) FILTER (WHERE role.role = 'foreshock') AS precursores,
+    count(*) FILTER (WHERE role.role = 'independent') AS independientes,
+    round(100.0 * count(*) FILTER (WHERE role.role IN ('mainshock', 'independent')) / count(*), 1) AS pct_desagrupado
+FROM seismic.declustering_run AS run
+JOIN seismic.event_sequence_role AS role USING (declustering_run_id)
+GROUP BY run.declustering_run_id, run.method, run.source_code, run.parameters
+ORDER BY run.declustering_run_id;
+
+-- 26. Los grandes terremotos segun cada ejecucion: replicas, mayor replica y
+-- duracion de la secuencia.
+SELECT
+    main.occurred_at::date AS fecha,
+    main.mw_homogenized AS mw,
+    run.declustering_run_id AS run,
+    run.method AS metodo,
+    coalesce(run.source_code, 'csn+usgs') AS catalogo,
+    sequence.aftershock_count AS replicas,
+    sequence.foreshock_count AS precursores,
+    sequence.largest_aftershock_magnitude AS mayor_replica,
+    round(extract(epoch FROM sequence.ended_at - sequence.started_at) / 86400) AS dias
+FROM seismic.seismic_sequence AS sequence
+JOIN seismic.declustering_run AS run USING (declustering_run_id)
+JOIN seismic.earthquake_event AS main ON main.earthquake_event_id = sequence.mainshock_event_id
+WHERE main.mw_homogenized >= 7.8
+  AND main.occurred_at >= '1960-01-01'
+ORDER BY main.occurred_at, run.declustering_run_id;
+
+-- 27. Ley de Bath: diferencia entre el sismo principal y su mayor replica en
+-- las secuencias con principal Mw >= 6,5 (se espera ~1,2 en promedio).
+SELECT
+    run.declustering_run_id AS run,
+    run.method AS metodo,
+    coalesce(run.source_code, 'csn+usgs') AS catalogo,
+    count(*) AS secuencias,
+    round(avg(main.mw_homogenized - sequence.largest_aftershock_magnitude), 2) AS delta_m_medio,
+    round((percentile_cont(0.5) WITHIN GROUP (
+        ORDER BY main.mw_homogenized - sequence.largest_aftershock_magnitude))::numeric, 2) AS delta_m_mediana
+FROM seismic.seismic_sequence AS sequence
+JOIN seismic.declustering_run AS run USING (declustering_run_id)
+JOIN seismic.earthquake_event AS main ON main.earthquake_event_id = sequence.mainshock_event_id
+WHERE main.mw_homogenized >= 6.5
+  AND sequence.largest_aftershock_magnitude IS NOT NULL
+GROUP BY run.declustering_run_id, run.method, run.source_code
+ORDER BY run.declustering_run_id;
