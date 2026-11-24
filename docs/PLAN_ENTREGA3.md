@@ -218,7 +218,7 @@ El esqueleto ya está en `main` (22-11). Para correrlo, con la base encendida: `
 | 1. USGS completo + `event_impact_summary` | Gabriel | **Hecho** (22-11): 31.007 sismos USGS; 5.321 resúmenes de impacto (1.165 con ShakeMap) |
 | 2. `event_match` + `Mlv` | Gabriel | **Hecho** (22-11): 29.219 pares; 61.133 sismos únicos; `Mlv` calibrada (−0,09); consultas 16 a 19 |
 | 3. Réplicas: Gardner-Knopoff y ST-DBSCAN | Gabriel | **Hecho** (23-11): 4 ejecuciones (GK sin duplicados con precursores de 30 días, GK con ventana simétrica, GK solo USGS y ST-DBSCAN); Båth 1,19; consultas 25 a 27 |
-| 4. Test de Knox, elipses, Omori y Båth | Gabriel | Pendiente |
+| 4. Test de Knox, elipses, Omori y Båth | Gabriel | **Knox y Båth hechos** (23-11; `docs/analisis/KNOX.md`): GK elimina la interacción (incluso de más), ST-DBSCAN deja una parte. Pendiente: elipses y Omori de todas las secuencias (hoy solo el Maule, en `scripts/render_ui_modes.py`) |
 | 5. Descargador de ShakeMap | Ignacio | Pendiente |
 | 6. Carga de contornos | Ignacio | Pendiente |
 | 7. Población expuesta a MMI ≥ VI | Ignacio | Pendiente |
